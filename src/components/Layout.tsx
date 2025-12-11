@@ -36,7 +36,7 @@ export function Layout() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/auth");
+    navigate("/");
   };
 
   if (loading) {
