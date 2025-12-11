@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { Layout } from "./components/Layout";
+import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Sales from "./pages/Sales";
 import Stock from "./pages/Stock";
@@ -23,8 +24,9 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={<Layout />}>
+            <Route path="/dashboard" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="sales" element={<Sales />} />
               <Route path="stock" element={<Stock />} />

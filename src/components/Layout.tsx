@@ -15,11 +15,11 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: Home },
-  { name: "Sales", href: "/sales", icon: ShoppingCart },
-  { name: "Stock", href: "/stock", icon: Package },
-  { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Dashboard", href: "/dashboard", icon: Home },
+  { name: "Sales", href: "/dashboard/sales", icon: ShoppingCart },
+  { name: "Stock", href: "/dashboard/stock", icon: Package },
+  { name: "Reports", href: "/dashboard/reports", icon: BarChart3 },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 export function Layout() {
