@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Outlet, useNavigate, Link, useLocation } from "react-router-dom";
 import { 
   Home, 
   ShoppingCart, 
@@ -7,10 +7,12 @@ import {
   BarChart3, 
   Settings,
   Menu,
-  X
+  X,
+  LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
@@ -22,6 +24,35 @@ const navigation = [
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -39,7 +70,7 @@ export function Layout() {
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex items-center justify-between h-16 px-4 border-b">
-          <h1 className="text-xl font-bold text-primary">ShopKeeper POS</h1>
+          <h1 className="text-xl font-bold text-primary">Mama Duka POS</h1>
           <Button
             variant="ghost"
             size="sm"
@@ -52,16 +83,36 @@ export function Layout() {
         
         <nav className="p-4 space-y-2">
           {navigation.map((item) => (
-            <a
+            <Link
               key={item.name}
-              href={item.href}
-              className="flex items-center px-4 py-3 text-sm font-medium rounded-lg hover:bg-secondary transition-colors"
+              to={item.href}
+              className={cn(
+                "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                location.pathname === item.href 
+                  ? "bg-primary text-primary-foreground" 
+                  : "hover:bg-secondary"
+              )}
+              onClick={() => setSidebarOpen(false)}
             >
-              <item.icon className="mr-3 h-5 w-5 text-muted-foreground" />
+              <item.icon className={cn(
+                "mr-3 h-5 w-5",
+                location.pathname === item.href ? "text-primary-foreground" : "text-muted-foreground"
+              )} />
               {item.name}
-            </a>
+            </Link>
           ))}
         </nav>
+
+        <div className="absolute bottom-4 left-4 right-4">
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={handleSignOut}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
+        </div>
       </div>
 
       {/* Main content */}
@@ -77,9 +128,9 @@ export function Layout() {
             <Menu className="h-5 w-5" />
           </Button>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 ml-auto">
             <span className="text-sm text-muted-foreground">
-              Today: {new Date().toLocaleDateString()}
+              {new Date().toLocaleDateString()}
             </span>
           </div>
         </div>
