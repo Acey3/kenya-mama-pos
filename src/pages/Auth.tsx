@@ -122,7 +122,7 @@ const Auth = () => {
     setLoading(true);
     const redirectUrl = `${window.location.origin}/`;
 
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
       options: {
@@ -130,6 +130,9 @@ const Auth = () => {
         data: {
           full_name: formData.fullName,
           phone: formData.phone,
+          business_name: formData.businessName,
+          business_type: formData.businessType || null,
+          location: formData.location || null,
         },
       },
     });
@@ -147,29 +150,10 @@ const Auth = () => {
       return;
     }
 
-    if (data.user) {
-      // Create business record
-      const { error: businessError } = await supabase.from("businesses").insert({
-        owner_id: data.user.id,
-        business_name: formData.businessName,
-        business_type: formData.businessType || null,
-        location: formData.location || null,
-        phone: formData.phone || null,
-      });
-
-      if (businessError) {
-        toast({
-          title: "Business registration failed",
-          description: "Account created but business details could not be saved. Please update in settings.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Registration successful!",
-          description: "Welcome to Mama Duka POS. Check your email to confirm your account.",
-        });
-      }
-    }
+    toast({
+      title: "Registration successful!",
+      description: "Welcome to Mama Duka POS. Check your email to confirm your account.",
+    });
     setLoading(false);
   };
 
