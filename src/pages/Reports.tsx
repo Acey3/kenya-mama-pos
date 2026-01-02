@@ -53,7 +53,7 @@ export default function Reports() {
   const periodLabel = selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Reports & Analytics</h1>
