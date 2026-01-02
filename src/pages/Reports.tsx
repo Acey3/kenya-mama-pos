@@ -1,9 +1,18 @@
 import { useState } from "react";
-import { Calendar, Download, TrendingUp, DollarSign, ShoppingCart } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Calendar, Download, TrendingUp, DollarSign, ShoppingCart, FileText, FileSpreadsheet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportToPDF, exportToExcel } from "@/lib/exportUtils";
+import { toast } from "@/hooks/use-toast";
 
 const salesData = {
   daily: {
@@ -47,29 +56,88 @@ const recentTransactions = [
 ];
 
 export default function Reports() {
+  const { t } = useTranslation();
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   
   const currentData = salesData[selectedPeriod];
   const periodLabel = selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1);
 
+  const handleExportPDF = () => {
+    try {
+      exportToPDF({
+        period: periodLabel,
+        sales: currentData.sales,
+        transactions: currentData.transactions,
+        profit: currentData.profit,
+        topProducts: currentData.topProducts,
+      });
+      toast({
+        title: "Export Successful",
+        description: `${periodLabel} report exported as PDF`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportExcel = () => {
+    try {
+      exportToExcel({
+        period: periodLabel,
+        sales: currentData.sales,
+        transactions: currentData.transactions,
+        profit: currentData.profit,
+        topProducts: currentData.topProducts,
+      });
+      toast({
+        title: "Export Successful",
+        description: `${periodLabel} report exported as Excel`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export Excel. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Reports & Analytics</h1>
-          <p className="text-muted-foreground">Track your business performance and insights</p>
+          <h1 className="text-3xl font-bold">{t('reports.title')}</h1>
+          <p className="text-muted-foreground">{t('reports.subtitle')}</p>
         </div>
-        <Button variant="outline">
-          <Download className="mr-2 h-4 w-4" />
-          Export Report
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              {t('reports.exportReport')}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportPDF}>
+              <FileText className="mr-2 h-4 w-4" />
+              Export as PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportExcel}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Export as Excel
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Tabs value={selectedPeriod} onValueChange={setSelectedPeriod as any}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="daily">Daily</TabsTrigger>
-          <TabsTrigger value="weekly">Weekly</TabsTrigger>
-          <TabsTrigger value="monthly">Monthly</TabsTrigger>
+          <TabsTrigger value="daily">{t('reports.daily')}</TabsTrigger>
+          <TabsTrigger value="weekly">{t('reports.weekly')}</TabsTrigger>
+          <TabsTrigger value="monthly">{t('reports.monthly')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value={selectedPeriod} className="space-y-6">
@@ -77,7 +145,7 @@ export default function Reports() {
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{periodLabel} Sales</CardTitle>
+                <CardTitle className="text-sm font-medium">{periodLabel} {t('reports.sales')}</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -90,7 +158,7 @@ export default function Reports() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Transactions</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('reports.transactions')}</CardTitle>
                 <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -101,7 +169,7 @@ export default function Reports() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Profit</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('reports.profit')}</CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -117,7 +185,7 @@ export default function Reports() {
             {/* Top Products */}
             <Card>
               <CardHeader>
-                <CardTitle>Top Selling Products ({periodLabel})</CardTitle>
+                <CardTitle>{t('reports.topProducts')} ({periodLabel})</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -144,7 +212,7 @@ export default function Reports() {
             {/* Recent Transactions */}
             <Card>
               <CardHeader>
-                <CardTitle>Recent Transactions</CardTitle>
+                <CardTitle>{t('reports.recentTransactions')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -175,7 +243,7 @@ export default function Reports() {
           {/* Additional Insights */}
           <Card>
             <CardHeader>
-              <CardTitle>Business Insights</CardTitle>
+              <CardTitle>{t('reports.businessInsights')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
