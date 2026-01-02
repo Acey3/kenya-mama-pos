@@ -52,7 +52,10 @@ export function useSales() {
   // Fetch business ID
   useEffect(() => {
     const fetchBusinessId = async () => {
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('businesses')
@@ -62,6 +65,9 @@ export function useSales() {
 
       if (data && !error) {
         setBusinessId(data.id);
+      } else {
+        // No business found - stop loading
+        setLoading(false);
       }
     };
 
