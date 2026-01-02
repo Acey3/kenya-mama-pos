@@ -14,12 +14,14 @@ import {
 } from "@/components/ui/dialog";
 import { MpesaPayment } from "@/components/MpesaPayment";
 import { generateReceipt } from "@/lib/exportUtils";
+import { useSales } from "@/hooks/useSales";
 import { toast } from "@/hooks/use-toast";
 
 interface Product {
   id: string;
   name: string;
   price: number;
+  costPrice: number;
   stock: number;
   category: string;
 }
@@ -28,22 +30,25 @@ interface CartItem extends Product {
   quantity: number;
 }
 
+// Mock products with cost price for profit calculation
 const products: Product[] = [
-  { id: "1", name: "Coca Cola 500ml", price: 80, stock: 50, category: "Beverages" },
-  { id: "2", name: "White Bread", price: 60, stock: 30, category: "Bakery" },
-  { id: "3", name: "Milk 1L", price: 110, stock: 25, category: "Dairy" },
-  { id: "4", name: "Sugar 2kg", price: 280, stock: 15, category: "Grocery" },
-  { id: "5", name: "Tea Leaves 250g", price: 150, stock: 20, category: "Grocery" },
-  { id: "6", name: "Cooking Oil 1L", price: 350, stock: 12, category: "Grocery" },
+  { id: "1", name: "Coca Cola 500ml", price: 80, costPrice: 65, stock: 50, category: "Beverages" },
+  { id: "2", name: "White Bread", price: 60, costPrice: 45, stock: 30, category: "Bakery" },
+  { id: "3", name: "Milk 1L", price: 110, costPrice: 95, stock: 25, category: "Dairy" },
+  { id: "4", name: "Sugar 2kg", price: 280, costPrice: 250, stock: 15, category: "Grocery" },
+  { id: "5", name: "Tea Leaves 250g", price: 150, costPrice: 120, stock: 20, category: "Grocery" },
+  { id: "6", name: "Cooking Oil 1L", price: 350, costPrice: 300, stock: 12, category: "Grocery" },
 ];
 
 export default function Sales() {
   const { t } = useTranslation();
+  const { recordSale } = useSales();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isMpesaDialogOpen, setIsMpesaDialogOpen] = useState(false);
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
   const [lastTransactionId, setLastTransactionId] = useState("");
+  const [lastTotal, setLastTotal] = useState(0);
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -80,11 +85,12 @@ export default function Sales() {
   };
 
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const profit = cart.reduce((sum, item) => sum + ((item.price - item.costPrice) * item.quantity), 0);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const clearCart = () => setCart([]);
 
-  const completeCashSale = () => {
+  const completeCashSale = async () => {
     if (cart.length === 0) {
       toast({
         title: "Cart Empty",
@@ -103,6 +109,17 @@ export default function Sales() {
       
       const transactionId = generateReceipt(items, total, "Cash");
       setLastTransactionId(transactionId);
+      setLastTotal(total);
+      
+      // Record sale to database
+      const saleItems = cart.map(item => ({
+        product_name: item.name,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity,
+      }));
+      
+      await recordSale(transactionId, total, profit, 'cash', saleItems);
       
       toast({
         title: "Sale Completed!",
@@ -132,7 +149,7 @@ export default function Sales() {
     setIsMpesaDialogOpen(true);
   };
 
-  const handleMpesaSuccess = () => {
+  const handleMpesaSuccess = async () => {
     try {
       const items = cart.map(item => ({
         name: item.name,
@@ -142,7 +159,18 @@ export default function Sales() {
       
       const transactionId = generateReceipt(items, total, "M-Pesa");
       setLastTransactionId(transactionId);
+      setLastTotal(total);
       setIsMpesaDialogOpen(false);
+      
+      // Record sale to database
+      const saleItems = cart.map(item => ({
+        product_name: item.name,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity,
+      }));
+      
+      await recordSale(transactionId, total, profit, 'mpesa', saleItems);
       
       toast({
         title: "M-Pesa Payment Received!",
@@ -331,7 +359,7 @@ export default function Sales() {
             </DialogDescription>
           </DialogHeader>
           <div className="text-center space-y-4 py-4">
-            <p className="text-2xl font-bold">KSh {total.toLocaleString()}</p>
+            <p className="text-2xl font-bold">KSh {lastTotal.toLocaleString()}</p>
             <p className="text-muted-foreground">Receipt has been downloaded</p>
             <Button onClick={() => setIsReceiptDialogOpen(false)} className="w-full">
               Start New Sale
