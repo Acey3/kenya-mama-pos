@@ -12,9 +12,10 @@ interface MpesaPaymentProps {
   amount: number;
   onSuccess?: (transactionId: string) => void;
   onError?: (error: string) => void;
+  onCancel?: () => void;
 }
 
-export function MpesaPayment({ amount, onSuccess, onError }: MpesaPaymentProps) {
+export function MpesaPayment({ amount, onSuccess, onError, onCancel }: MpesaPaymentProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -143,31 +144,34 @@ export function MpesaPayment({ amount, onSuccess, onError }: MpesaPaymentProps) 
           </div>
         )}
 
-        <Button
-          onClick={handlePayment}
-          disabled={isProcessing || !phoneNumber}
-          className="w-full bg-[#00A650] hover:bg-[#008B43]"
-          size="lg"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {t('mpesa.processing')}
-            </>
-          ) : (
-            <>
-              <img
-                src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg"
-                alt="M-Pesa"
-                className="h-5 w-5 mr-2"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-              {t('mpesa.pay')}
-            </>
+        <div className="flex gap-2">
+          {onCancel && (
+            <Button
+              variant="outline"
+              onClick={onCancel}
+              disabled={isProcessing}
+              className="flex-1"
+              size="lg"
+            >
+              Cancel
+            </Button>
           )}
-        </Button>
+          <Button
+            onClick={handlePayment}
+            disabled={isProcessing || !phoneNumber}
+            className="flex-1 bg-[#00A650] hover:bg-[#008B43]"
+            size="lg"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {t('mpesa.processing')}
+              </>
+            ) : (
+              t('mpesa.pay')
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
