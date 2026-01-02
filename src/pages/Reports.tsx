@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Calendar, Download, TrendingUp, DollarSign, ShoppingCart, FileText, FileSpreadsheet } from "lucide-react";
+import { Download, TrendingUp, DollarSign, ShoppingCart, FileText, FileSpreadsheet, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,54 +12,50 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { exportToPDF, exportToExcel } from "@/lib/exportUtils";
+import { useSales } from "@/hooks/useSales";
 import { toast } from "@/hooks/use-toast";
 
-const salesData = {
-  daily: {
-    sales: 12450,
-    transactions: 89,
-    profit: 3420,
-    topProducts: [
-      { name: "Coca Cola 500ml", quantity: 25, revenue: 2000 },
-      { name: "White Bread", quantity: 20, revenue: 1200 },
-      { name: "Milk 1L", quantity: 15, revenue: 1650 },
-    ]
-  },
-  weekly: {
-    sales: 87150,
-    transactions: 623,
-    profit: 23940,
-    topProducts: [
-      { name: "Coca Cola 500ml", quantity: 175, revenue: 14000 },
-      { name: "Sugar 2kg", quantity: 45, revenue: 12600 },
-      { name: "Cooking Oil 1L", quantity: 32, revenue: 11200 },
-    ]
-  },
-  monthly: {
-    sales: 345600,
-    transactions: 2487,
-    profit: 95280,
-    topProducts: [
-      { name: "Coca Cola 500ml", quantity: 700, revenue: 56000 },
-      { name: "Sugar 2kg", quantity: 180, revenue: 50400 },
-      { name: "Cooking Oil 1L", quantity: 128, revenue: 44800 },
-    ]
-  }
-};
-
-const recentTransactions = [
-  { id: "TXN001", items: "Coca Cola + Bread", amount: 180, method: "Cash", time: "10:30 AM" },
-  { id: "TXN002", items: "Milk 1L x2", amount: 220, method: "M-Pesa", time: "10:22 AM" },
-  { id: "TXN003", items: "Sugar 2kg", amount: 280, method: "Cash", time: "10:15 AM" },
-  { id: "TXN004", items: "Tea Leaves", amount: 150, method: "M-Pesa", time: "10:08 AM" },
-  { id: "TXN005", items: "Cooking Oil + Sugar", amount: 630, method: "Cash", time: "09:55 AM" },
+// Placeholder top products (would come from sale_items aggregation in a full implementation)
+const topProductsPlaceholder = [
+  { name: "Coca Cola 500ml", quantity: 25, revenue: 2000 },
+  { name: "White Bread", quantity: 20, revenue: 1200 },
+  { name: "Milk 1L", quantity: 15, revenue: 1650 },
 ];
 
 export default function Reports() {
   const { t } = useTranslation();
+  const { stats, loading, getRecentTransactions } = useSales();
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   
-  const currentData = salesData[selectedPeriod];
+  const recentTransactions = getRecentTransactions(5);
+
+  const getSalesDataForPeriod = () => {
+    switch (selectedPeriod) {
+      case 'daily':
+        return {
+          sales: stats.todaySales,
+          transactions: stats.todayTransactions,
+          profit: stats.todayProfit,
+          topProducts: topProductsPlaceholder,
+        };
+      case 'weekly':
+        return {
+          sales: stats.weeklySales,
+          transactions: stats.weeklyTransactions,
+          profit: stats.weeklyProfit,
+          topProducts: topProductsPlaceholder,
+        };
+      case 'monthly':
+        return {
+          sales: stats.monthlySales,
+          transactions: stats.monthlyTransactions,
+          profit: stats.monthlyProfit,
+          topProducts: topProductsPlaceholder,
+        };
+    }
+  };
+
+  const currentData = getSalesDataForPeriod();
   const periodLabel = selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1);
 
   const handleExportPDF = () => {
@@ -105,6 +101,14 @@ export default function Reports() {
       });
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
