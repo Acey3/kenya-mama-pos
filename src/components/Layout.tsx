@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Outlet, useNavigate, Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { 
   Home, 
   ShoppingCart, 
@@ -13,20 +14,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Sales", href: "/dashboard/sales", icon: ShoppingCart },
-  { name: "Stock", href: "/dashboard/stock", icon: Package },
-  { name: "Reports", href: "/dashboard/reports", icon: BarChart3 },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-];
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 
 export function Layout() {
+  const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const navigation = [
+    { name: t('common.dashboard'), href: "/dashboard", icon: Home },
+    { name: t('common.sales'), href: "/dashboard/sales", icon: ShoppingCart },
+    { name: t('common.stock'), href: "/dashboard/stock", icon: Package },
+    { name: t('common.reports'), href: "/dashboard/reports", icon: BarChart3 },
+    { name: t('common.settings'), href: "/dashboard/settings", icon: Settings },
+  ];
 
   useEffect(() => {
     if (!loading && !user) {
@@ -44,7 +48,7 @@ export function Layout() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -70,7 +74,7 @@ export function Layout() {
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex items-center justify-between h-16 px-4 border-b">
-          <h1 className="text-xl font-bold text-primary">Mama Duka POS</h1>
+          <h1 className="text-xl font-bold text-primary">Mama Duka</h1>
           <Button
             variant="ghost"
             size="sm"
@@ -84,7 +88,7 @@ export function Layout() {
         <nav className="p-4 space-y-2">
           {navigation.map((item) => (
             <Link
-              key={item.name}
+              key={item.href}
               to={item.href}
               className={cn(
                 "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors",
@@ -110,7 +114,7 @@ export function Layout() {
             onClick={handleSignOut}
           >
             <LogOut className="mr-2 h-4 w-4" />
-            Logout
+            {t('common.logout')}
           </Button>
         </div>
       </div>
@@ -129,7 +133,9 @@ export function Layout() {
           </Button>
           
           <div className="flex items-center space-x-4 ml-auto">
-            <span className="text-sm text-muted-foreground">
+            <OnlineStatusIndicator />
+            <LanguageSwitcher />
+            <span className="text-sm text-muted-foreground hidden sm:inline">
               {new Date().toLocaleDateString()}
             </span>
           </div>
