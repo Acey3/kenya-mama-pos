@@ -2,7 +2,6 @@ const CACHE_NAME = 'mama-duka-v1';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
-  '/favicon.ico',
 ];
 
 // Install event - cache static assets
