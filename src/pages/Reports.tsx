@@ -1,75 +1,147 @@
 import { useState } from "react";
-import { Calendar, Download, TrendingUp, DollarSign, ShoppingCart } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Download, TrendingUp, DollarSign, ShoppingCart, FileText, FileSpreadsheet, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportToPDF, exportToExcel } from "@/lib/exportUtils";
+import { useSales } from "@/hooks/useSales";
+import { toast } from "@/hooks/use-toast";
 
-const salesData = {
-  daily: {
-    sales: 12450,
-    transactions: 89,
-    profit: 3420,
-    topProducts: [
-      { name: "Coca Cola 500ml", quantity: 25, revenue: 2000 },
-      { name: "White Bread", quantity: 20, revenue: 1200 },
-      { name: "Milk 1L", quantity: 15, revenue: 1650 },
-    ]
-  },
-  weekly: {
-    sales: 87150,
-    transactions: 623,
-    profit: 23940,
-    topProducts: [
-      { name: "Coca Cola 500ml", quantity: 175, revenue: 14000 },
-      { name: "Sugar 2kg", quantity: 45, revenue: 12600 },
-      { name: "Cooking Oil 1L", quantity: 32, revenue: 11200 },
-    ]
-  },
-  monthly: {
-    sales: 345600,
-    transactions: 2487,
-    profit: 95280,
-    topProducts: [
-      { name: "Coca Cola 500ml", quantity: 700, revenue: 56000 },
-      { name: "Sugar 2kg", quantity: 180, revenue: 50400 },
-      { name: "Cooking Oil 1L", quantity: 128, revenue: 44800 },
-    ]
-  }
-};
-
-const recentTransactions = [
-  { id: "TXN001", items: "Coca Cola + Bread", amount: 180, method: "Cash", time: "10:30 AM" },
-  { id: "TXN002", items: "Milk 1L x2", amount: 220, method: "M-Pesa", time: "10:22 AM" },
-  { id: "TXN003", items: "Sugar 2kg", amount: 280, method: "Cash", time: "10:15 AM" },
-  { id: "TXN004", items: "Tea Leaves", amount: 150, method: "M-Pesa", time: "10:08 AM" },
-  { id: "TXN005", items: "Cooking Oil + Sugar", amount: 630, method: "Cash", time: "09:55 AM" },
+// Placeholder top products (would come from sale_items aggregation in a full implementation)
+const topProductsPlaceholder = [
+  { name: "Coca Cola 500ml", quantity: 25, revenue: 2000 },
+  { name: "White Bread", quantity: 20, revenue: 1200 },
+  { name: "Milk 1L", quantity: 15, revenue: 1650 },
 ];
 
 export default function Reports() {
+  const { t } = useTranslation();
+  const { stats, loading, getRecentTransactions } = useSales();
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   
-  const currentData = salesData[selectedPeriod];
+  const recentTransactions = getRecentTransactions(5);
+
+  const getSalesDataForPeriod = () => {
+    switch (selectedPeriod) {
+      case 'daily':
+        return {
+          sales: stats.todaySales,
+          transactions: stats.todayTransactions,
+          profit: stats.todayProfit,
+          topProducts: topProductsPlaceholder,
+        };
+      case 'weekly':
+        return {
+          sales: stats.weeklySales,
+          transactions: stats.weeklyTransactions,
+          profit: stats.weeklyProfit,
+          topProducts: topProductsPlaceholder,
+        };
+      case 'monthly':
+        return {
+          sales: stats.monthlySales,
+          transactions: stats.monthlyTransactions,
+          profit: stats.monthlyProfit,
+          topProducts: topProductsPlaceholder,
+        };
+    }
+  };
+
+  const currentData = getSalesDataForPeriod();
   const periodLabel = selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1);
+
+  const handleExportPDF = () => {
+    try {
+      exportToPDF({
+        period: periodLabel,
+        sales: currentData.sales,
+        transactions: currentData.transactions,
+        profit: currentData.profit,
+        topProducts: currentData.topProducts,
+      });
+      toast({
+        title: "Export Successful",
+        description: `${periodLabel} report exported as PDF`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportExcel = () => {
+    try {
+      exportToExcel({
+        period: periodLabel,
+        sales: currentData.sales,
+        transactions: currentData.transactions,
+        profit: currentData.profit,
+        topProducts: currentData.topProducts,
+      });
+      toast({
+        title: "Export Successful",
+        description: `${periodLabel} report exported as Excel`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Failed to export Excel. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Reports & Analytics</h1>
-          <p className="text-muted-foreground">Track your business performance and insights</p>
+          <h1 className="text-3xl font-bold">{t('reports.title')}</h1>
+          <p className="text-muted-foreground">{t('reports.subtitle')}</p>
         </div>
-        <Button variant="outline">
-          <Download className="mr-2 h-4 w-4" />
-          Export Report
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              {t('reports.exportReport')}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportPDF}>
+              <FileText className="mr-2 h-4 w-4" />
+              Export as PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportExcel}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Export as Excel
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Tabs value={selectedPeriod} onValueChange={setSelectedPeriod as any}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="daily">Daily</TabsTrigger>
-          <TabsTrigger value="weekly">Weekly</TabsTrigger>
-          <TabsTrigger value="monthly">Monthly</TabsTrigger>
+          <TabsTrigger value="daily">{t('reports.daily')}</TabsTrigger>
+          <TabsTrigger value="weekly">{t('reports.weekly')}</TabsTrigger>
+          <TabsTrigger value="monthly">{t('reports.monthly')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value={selectedPeriod} className="space-y-6">
@@ -77,7 +149,7 @@ export default function Reports() {
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{periodLabel} Sales</CardTitle>
+                <CardTitle className="text-sm font-medium">{periodLabel} {t('reports.sales')}</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -90,7 +162,7 @@ export default function Reports() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Transactions</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('reports.transactions')}</CardTitle>
                 <ShoppingCart className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -101,7 +173,7 @@ export default function Reports() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Profit</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('reports.profit')}</CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -117,7 +189,7 @@ export default function Reports() {
             {/* Top Products */}
             <Card>
               <CardHeader>
-                <CardTitle>Top Selling Products ({periodLabel})</CardTitle>
+                <CardTitle>{t('reports.topProducts')} ({periodLabel})</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -144,7 +216,7 @@ export default function Reports() {
             {/* Recent Transactions */}
             <Card>
               <CardHeader>
-                <CardTitle>Recent Transactions</CardTitle>
+                <CardTitle>{t('reports.recentTransactions')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -175,7 +247,7 @@ export default function Reports() {
           {/* Additional Insights */}
           <Card>
             <CardHeader>
-              <CardTitle>Business Insights</CardTitle>
+              <CardTitle>{t('reports.businessInsights')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
