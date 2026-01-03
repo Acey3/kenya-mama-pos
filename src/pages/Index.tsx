@@ -425,7 +425,7 @@ const Index = () => {
             <span className="font-semibold text-foreground">Mama Duka POS</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            © 2024 Mama Duka. Built with ❤️ for Kenyan shopkeepers.
+            © 2025 Mama Duka. Built with ❤️ for Kenyan shopkeepers.
           </p>
         </div>
       </footer>
