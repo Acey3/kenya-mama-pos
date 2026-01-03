@@ -50,27 +50,27 @@ export function useSales() {
   const [loading, setLoading] = useState(true);
 
   // Fetch business ID
+  const fetchBusinessId = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('owner_id', user.id)
+      .maybeSingle();
+
+    if (data && !error) {
+      setBusinessId(data.id);
+    } else {
+      // No business found - stop loading
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchBusinessId = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('owner_id', user.id)
-        .maybeSingle();
-
-      if (data && !error) {
-        setBusinessId(data.id);
-      } else {
-        // No business found - stop loading
-        setLoading(false);
-      }
-    };
-
     fetchBusinessId();
   }, [user]);
 
@@ -189,13 +189,21 @@ export function useSales() {
     }));
   };
 
+  // Combined fetch that re-fetches business ID if needed
+  const refreshData = async () => {
+    if (!businessId) {
+      await fetchBusinessId();
+    }
+    await fetchSales();
+  };
+
   return {
     businessId,
     sales,
     stats,
     loading,
     recordSale,
-    fetchSales,
+    fetchSales: refreshData,
     getRecentTransactions,
   };
 }

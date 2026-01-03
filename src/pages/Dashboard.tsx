@@ -4,20 +4,25 @@ import {
   ShoppingCart, 
   Package, 
   TrendingUp, 
-  AlertTriangle,
   DollarSign,
   Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useSales } from "@/hooks/useSales";
+import { BusinessSetupWizard } from "@/components/BusinessSetupWizard";
 
 export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { stats, loading, getRecentTransactions } = useSales();
+  const { stats, loading, businessId, getRecentTransactions, fetchSales } = useSales();
   
   const recentTransactions = getRecentTransactions(5);
+
+  // Show setup wizard if no business exists
+  if (!loading && !businessId) {
+    return <BusinessSetupWizard onComplete={() => fetchSales()} />;
+  }
 
   const dashboardStats = [
     {
