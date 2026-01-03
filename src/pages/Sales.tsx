@@ -1,34 +1,38 @@
 import { useState } from "react";
-import { Plus, Minus, Trash2, Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Plus, Minus, Trash2, Search, Receipt, Smartphone, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  stock: number;
-  category: string;
-}
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { MpesaPayment } from "@/components/MpesaPayment";
+import { generateReceipt } from "@/lib/exportUtils";
+import { useSales } from "@/hooks/useSales";
+import { useProducts, Product } from "@/hooks/useProducts";
+import { toast } from "@/hooks/use-toast";
 
 interface CartItem extends Product {
   quantity: number;
 }
 
-const products: Product[] = [
-  { id: "1", name: "Coca Cola 500ml", price: 80, stock: 50, category: "Beverages" },
-  { id: "2", name: "White Bread", price: 60, stock: 30, category: "Bakery" },
-  { id: "3", name: "Milk 1L", price: 110, stock: 25, category: "Dairy" },
-  { id: "4", name: "Sugar 2kg", price: 280, stock: 15, category: "Grocery" },
-  { id: "5", name: "Tea Leaves 250g", price: 150, stock: 20, category: "Grocery" },
-  { id: "6", name: "Cooking Oil 1L", price: 350, stock: 12, category: "Grocery" },
-];
-
 export default function Sales() {
+  const { t } = useTranslation();
+  const { recordSale } = useSales();
+  const { products, loading, updateStock } = useProducts();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isMpesaDialogOpen, setIsMpesaDialogOpen] = useState(false);
+  const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
+  const [lastTransactionId, setLastTransactionId] = useState("");
+  const [lastTotal, setLastTotal] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -65,24 +69,122 @@ export default function Sales() {
   };
 
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const profit = cart.reduce((sum, item) => sum + ((item.price - item.costPrice) * item.quantity), 0);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const clearCart = () => setCart([]);
+
+  const completeSale = async (paymentMethod: 'cash' | 'mpesa') => {
+    if (cart.length === 0) {
+      toast({
+        title: "Cart Empty",
+        description: "Please add items to cart before completing sale",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const items = cart.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      }));
+      
+      const transactionId = generateReceipt(items, total, paymentMethod === 'cash' ? 'Cash' : 'M-Pesa');
+      setLastTransactionId(transactionId);
+      setLastTotal(total);
+      
+      // Record sale to database
+      const saleItems = cart.map(item => ({
+        product_name: item.name,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity,
+      }));
+      
+      await recordSale(transactionId, total, profit, paymentMethod, saleItems);
+      
+      // Update stock for each item
+      for (const item of cart) {
+        await updateStock(item.id, item.quantity);
+      }
+      
+      toast({
+        title: "Sale Completed!",
+        description: `Transaction ${transactionId} - KSh ${total.toLocaleString()} (${paymentMethod === 'cash' ? 'Cash' : 'M-Pesa'})`,
+      });
+      
+      setIsReceiptDialogOpen(true);
+      clearCart();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to complete sale. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const completeCashSale = () => completeSale('cash');
+
+  const handleMpesaPayment = () => {
+    if (cart.length === 0) {
+      toast({
+        title: "Cart Empty",
+        description: "Please add items to cart before payment",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsMpesaDialogOpen(true);
+  };
+
+  const handleMpesaSuccess = async () => {
+    setIsMpesaDialogOpen(false);
+    await completeSale('mpesa');
+  };
+
+  const printReceipt = () => {
+    if (cart.length > 0) {
+      const items = cart.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      }));
+      generateReceipt(items, total, "Cash");
+      toast({
+        title: "Receipt Generated",
+        description: "Receipt PDF has been downloaded",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       {/* Products Section */}
       <div className="lg:col-span-2 space-y-4">
         <div>
-          <h1 className="text-3xl font-bold">Sales</h1>
-          <p className="text-muted-foreground">Select products to add to cart</p>
+          <h1 className="text-3xl font-bold">{t('sales.title')}</h1>
+          <p className="text-muted-foreground">{t('sales.subtitle')}</p>
         </div>
 
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Search products..."
+            placeholder={t('sales.searchProducts')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -91,29 +193,39 @@ export default function Sales() {
 
         {/* Products Grid */}
         <div className="grid sm:grid-cols-2 gap-4">
-          {filteredProducts.map((product) => (
-            <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold">{product.name}</h3>
-                  <Badge variant="secondary">{product.category}</Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-xl font-bold text-primary">KSh {product.price}</p>
-                    <p className="text-sm text-muted-foreground">Stock: {product.stock}</p>
+          {products.length === 0 ? (
+            <div className="col-span-2 text-center py-12 text-muted-foreground">
+              No products available. Add products in the Stock page first.
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="col-span-2 text-center py-12 text-muted-foreground">
+              No products match your search.
+            </div>
+          ) : (
+            filteredProducts.map((product) => (
+              <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-semibold">{product.name}</h3>
+                    <Badge variant="secondary">{product.category}</Badge>
                   </div>
-                  <Button
-                    onClick={() => addToCart(product)}
-                    disabled={product.stock === 0}
-                    size="sm"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xl font-bold text-primary">KSh {product.price}</p>
+                      <p className="text-sm text-muted-foreground">{t('sales.stock')}: {product.stock}</p>
+                    </div>
+                    <Button
+                      onClick={() => addToCart(product)}
+                      disabled={product.stock === 0}
+                      size="sm"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
 
@@ -121,10 +233,10 @@ export default function Sales() {
       <Card className="h-fit">
         <CardHeader>
           <CardTitle className="flex justify-between items-center">
-            <span>Cart ({itemCount})</span>
+            <span>{t('sales.cart')} ({itemCount})</span>
             {cart.length > 0 && (
               <Button variant="ghost" size="sm" onClick={clearCart}>
-                Clear
+                {t('sales.clear')}
               </Button>
             )}
           </CardTitle>
@@ -132,7 +244,7 @@ export default function Sales() {
         <CardContent className="space-y-4">
           {cart.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Cart is empty. Add products to start a sale.
+              {t('sales.emptyCart')}
             </p>
           ) : (
             <>
@@ -143,7 +255,7 @@ export default function Sales() {
                     <div className="flex-1">
                       <h4 className="font-medium">{item.name}</h4>
                       <p className="text-sm text-muted-foreground">
-                        KSh {item.price} each
+                        KSh {item.price} {t('sales.each')}
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -178,16 +290,19 @@ export default function Sales() {
               {/* Cart Total */}
               <div className="border-t pt-4">
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-lg font-semibold">Total:</span>
+                  <span className="text-lg font-semibold">{t('sales.total')}:</span>
                   <span className="text-2xl font-bold text-primary">KSh {total.toLocaleString()}</span>
                 </div>
                 
                 <div className="space-y-2">
-                  <Button className="w-full" size="lg">
-                    Complete Sale (Cash)
+                  <Button className="w-full" size="lg" onClick={completeCashSale} disabled={isProcessing}>
+                    {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Receipt className="mr-2 h-4 w-4" />
+                    {t('sales.completeSale')} (Cash)
                   </Button>
-                  <Button variant="outline" className="w-full" size="lg">
-                    M-Pesa Payment
+                  <Button variant="outline" className="w-full" size="lg" onClick={handleMpesaPayment} disabled={isProcessing}>
+                    <Smartphone className="mr-2 h-4 w-4" />
+                    {t('sales.mpesaPayment')}
                   </Button>
                 </div>
               </div>
@@ -195,6 +310,42 @@ export default function Sales() {
           )}
         </CardContent>
       </Card>
+
+      {/* M-Pesa Payment Dialog */}
+      <Dialog open={isMpesaDialogOpen} onOpenChange={setIsMpesaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>M-Pesa Payment</DialogTitle>
+            <DialogDescription>
+              Enter customer's phone number to send payment request
+            </DialogDescription>
+          </DialogHeader>
+          <MpesaPayment 
+            amount={total} 
+            onSuccess={handleMpesaSuccess}
+            onCancel={() => setIsMpesaDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt Success Dialog */}
+      <Dialog open={isReceiptDialogOpen} onOpenChange={setIsReceiptDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-center text-success">✓ Sale Complete!</DialogTitle>
+            <DialogDescription className="text-center">
+              Transaction ID: {lastTransactionId}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-center space-y-4 py-4">
+            <p className="text-2xl font-bold">KSh {lastTotal.toLocaleString()}</p>
+            <p className="text-muted-foreground">Receipt has been downloaded</p>
+            <Button onClick={() => setIsReceiptDialogOpen(false)} className="w-full">
+              Start New Sale
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

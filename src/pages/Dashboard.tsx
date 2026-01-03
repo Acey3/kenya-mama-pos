@@ -1,70 +1,78 @@
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { 
   ShoppingCart, 
   Package, 
   TrendingUp, 
-  AlertTriangle,
   DollarSign,
-  Users
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-
-const stats = [
-  {
-    title: "Today's Sales",
-    value: "KSh 12,450",
-    change: "+8.2%",
-    icon: DollarSign,
-    positive: true
-  },
-  {
-    title: "Items Sold",
-    value: "89",
-    change: "+12%",
-    icon: ShoppingCart,
-    positive: true
-  },
-  {
-    title: "Low Stock Items",
-    value: "5",
-    change: "2 critical",
-    icon: AlertTriangle,
-    positive: false
-  },
-  {
-    title: "Total Products",
-    value: "234",
-    change: "+3 new",
-    icon: Package,
-    positive: true
-  }
-];
-
-const lowStockItems = [
-  { name: "Coca Cola 500ml", stock: 2, critical: true },
-  { name: "White Bread", stock: 5, critical: false },
-  { name: "Milk 1L", stock: 3, critical: true },
-  { name: "Sugar 2kg", stock: 8, critical: false },
-];
-
-const recentSales = [
-  { item: "Coca Cola + Bread", amount: "KSh 180", time: "2 min ago" },
-  { item: "Milk 1L x2", amount: "KSh 220", time: "8 min ago" },
-  { item: "Sugar 2kg", amount: "KSh 280", time: "15 min ago" },
-  { item: "Tea Leaves", amount: "KSh 150", time: "23 min ago" },
-];
+import { useSales } from "@/hooks/useSales";
+import { BusinessSetupWizard } from "@/components/BusinessSetupWizard";
 
 export default function Dashboard() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { stats, loading, businessId, getRecentTransactions, fetchSales } = useSales();
+  
+  const recentTransactions = getRecentTransactions(5);
+
+  // Show setup wizard if no business exists
+  if (!loading && !businessId) {
+    return <BusinessSetupWizard onComplete={() => fetchSales()} />;
+  }
+
+  const dashboardStats = [
+    {
+      title: t('dashboard.todaysSales'),
+      value: `KSh ${stats.todaySales.toLocaleString()}`,
+      change: `${stats.todayTransactions} ${t('dashboard.transactions')}`,
+      icon: DollarSign,
+      positive: true
+    },
+    {
+      title: t('dashboard.itemsSold'),
+      value: stats.todayTransactions.toString(),
+      change: t('dashboard.today'),
+      icon: ShoppingCart,
+      positive: true
+    },
+    {
+      title: t('dashboard.todaysProfit'),
+      value: `KSh ${stats.todayProfit.toLocaleString()}`,
+      change: `${Math.round((stats.todayProfit / (stats.todaySales || 1)) * 100)}% ${t('dashboard.margin')}`,
+      icon: TrendingUp,
+      positive: true
+    },
+    {
+      title: t('dashboard.weeklyTotal'),
+      value: `KSh ${stats.weeklySales.toLocaleString()}`,
+      change: `${stats.weeklyTransactions} ${t('dashboard.transactions')}`,
+      icon: Package,
+      positive: true
+    }
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Here's your shop overview.</p>
+        <h1 className="text-3xl font-bold">{t('dashboard.title')}</h1>
+        <p className="text-muted-foreground">{t('dashboard.subtitle')}</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
+        {dashboardStats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
@@ -84,47 +92,46 @@ export default function Dashboard() {
         {/* Quick Actions */}
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>{t('dashboard.quickActions')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button className="w-full justify-start" size="lg">
+            <Button className="w-full justify-start" size="lg" onClick={() => navigate('/dashboard/sales')}>
               <ShoppingCart className="mr-2 h-5 w-5" />
-              Start New Sale
+              {t('dashboard.startNewSale')}
             </Button>
-            <Button variant="outline" className="w-full justify-start" size="lg">
+            <Button variant="outline" className="w-full justify-start" size="lg" onClick={() => navigate('/dashboard/stock')}>
               <Package className="mr-2 h-5 w-5" />
-              Add New Product
+              {t('dashboard.addNewProduct')}
             </Button>
-            <Button variant="outline" className="w-full justify-start" size="lg">
+            <Button variant="outline" className="w-full justify-start" size="lg" onClick={() => navigate('/dashboard/reports')}>
               <TrendingUp className="mr-2 h-5 w-5" />
-              View Reports
+              {t('dashboard.viewReports')}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Low Stock Alert */}
+        {/* Monthly Summary */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <AlertTriangle className="mr-2 h-5 w-5 text-warning" />
-              Low Stock Alert
+              <TrendingUp className="mr-2 h-5 w-5 text-primary" />
+              {t('dashboard.monthlySummary')}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {lowStockItems.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className={`text-sm ${item.critical ? 'text-destructive' : 'text-warning'}`}>
-                      {item.stock} remaining {item.critical && '(Critical!)'}
-                    </p>
-                  </div>
-                  <Button size="sm" variant="outline">
-                    Restock
-                  </Button>
-                </div>
-              ))}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t('dashboard.totalSales')}</span>
+                <span className="font-bold text-xl">KSh {stats.monthlySales.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t('dashboard.totalProfit')}</span>
+                <span className="font-bold text-xl text-success">KSh {stats.monthlyProfit.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t('dashboard.transactions')}</span>
+                <span className="font-bold">{stats.monthlyTransactions}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -133,20 +140,30 @@ export default function Dashboard() {
       {/* Recent Sales */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Sales</CardTitle>
+          <CardTitle>{t('dashboard.recentSales')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {recentSales.map((sale, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{sale.item}</p>
-                  <p className="text-sm text-muted-foreground">{sale.time}</p>
+          {recentTransactions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>{t('dashboard.noSalesYet')}</p>
+              <Button className="mt-4" onClick={() => navigate('/dashboard/sales')}>
+                {t('dashboard.startNewSale')}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {recentTransactions.map((sale, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{sale.items}</p>
+                    <p className="text-sm text-muted-foreground">{sale.time} • {sale.method}</p>
+                  </div>
+                  <p className="font-bold text-primary">KSh {sale.amount.toLocaleString()}</p>
                 </div>
-                <p className="font-bold text-primary">{sale.amount}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
