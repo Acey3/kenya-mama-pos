@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Edit, Trash2, Search, AlertTriangle, Download, FileText, FileSpreadsheet } from "lucide-react";
+import { Plus, Edit, Trash2, Search, AlertTriangle, Download, FileText, FileSpreadsheet, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,79 +46,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { exportStockToPDF, exportStockToExcel } from "@/lib/exportUtils";
 import { toast } from "@/hooks/use-toast";
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  stock: number;
-  category: string;
-  costPrice: number;
-  lowStockThreshold: number;
-}
-
-const initialProducts: Product[] = [
-  { 
-    id: "1", 
-    name: "Coca Cola 500ml", 
-    price: 80, 
-    stock: 50, 
-    category: "Beverages",
-    costPrice: 65,
-    lowStockThreshold: 10
-  },
-  { 
-    id: "2", 
-    name: "White Bread", 
-    price: 60, 
-    stock: 5, 
-    category: "Bakery",
-    costPrice: 45,
-    lowStockThreshold: 10
-  },
-  { 
-    id: "3", 
-    name: "Milk 1L", 
-    price: 110, 
-    stock: 3, 
-    category: "Dairy",
-    costPrice: 95,
-    lowStockThreshold: 5
-  },
-  { 
-    id: "4", 
-    name: "Sugar 2kg", 
-    price: 280, 
-    stock: 15, 
-    category: "Grocery",
-    costPrice: 250,
-    lowStockThreshold: 8
-  },
-  { 
-    id: "5", 
-    name: "Tea Leaves 250g", 
-    price: 150, 
-    stock: 20, 
-    category: "Grocery",
-    costPrice: 120,
-    lowStockThreshold: 10
-  },
-  { 
-    id: "6", 
-    name: "Cooking Oil 1L", 
-    price: 350, 
-    stock: 12, 
-    category: "Grocery",
-    costPrice: 300,
-    lowStockThreshold: 8
-  },
-];
+import { useProducts, Product } from "@/hooks/useProducts";
 
 const categoryOptions = ["Beverages", "Bakery", "Dairy", "Grocery", "Household", "Snacks"];
 
 export default function Stock() {
   const { t } = useTranslation();
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const { products, loading, addProduct, updateProduct, deleteProduct } = useProducts();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   
@@ -127,6 +61,7 @@ export default function Stock() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -167,7 +102,7 @@ export default function Stock() {
     });
   };
 
-  const handleAddProduct = () => {
+  const handleAddProduct = async () => {
     if (!formData.name || !formData.price || !formData.stock || !formData.costPrice) {
       toast({
         title: "Validation Error",
@@ -177,26 +112,28 @@ export default function Stock() {
       return;
     }
 
-    const newProduct: Product = {
-      id: Date.now().toString(),
+    setIsSaving(true);
+    const result = await addProduct({
       name: formData.name,
       price: parseFloat(formData.price),
       stock: parseInt(formData.stock),
       category: formData.category,
       costPrice: parseFloat(formData.costPrice),
       lowStockThreshold: parseInt(formData.lowStockThreshold),
-    };
-
-    setProducts([...products, newProduct]);
-    setIsAddDialogOpen(false);
-    resetForm();
-    toast({
-      title: "Product Added",
-      description: `${newProduct.name} has been added to inventory`,
     });
+    setIsSaving(false);
+
+    if (result) {
+      setIsAddDialogOpen(false);
+      resetForm();
+      toast({
+        title: "Product Added",
+        description: `${result.name} has been added to inventory`,
+      });
+    }
   };
 
-  const handleEditProduct = () => {
+  const handleEditProduct = async () => {
     if (!selectedProduct || !formData.name || !formData.price || !formData.stock || !formData.costPrice) {
       toast({
         title: "Validation Error",
@@ -206,38 +143,43 @@ export default function Stock() {
       return;
     }
 
-    setProducts(products.map(p => 
-      p.id === selectedProduct.id 
-        ? {
-            ...p,
-            name: formData.name,
-            price: parseFloat(formData.price),
-            stock: parseInt(formData.stock),
-            category: formData.category,
-            costPrice: parseFloat(formData.costPrice),
-            lowStockThreshold: parseInt(formData.lowStockThreshold),
-          }
-        : p
-    ));
-    setIsEditDialogOpen(false);
-    setSelectedProduct(null);
-    resetForm();
-    toast({
-      title: "Product Updated",
-      description: `${formData.name} has been updated`,
+    setIsSaving(true);
+    const success = await updateProduct(selectedProduct.id, {
+      name: formData.name,
+      price: parseFloat(formData.price),
+      stock: parseInt(formData.stock),
+      category: formData.category,
+      costPrice: parseFloat(formData.costPrice),
+      lowStockThreshold: parseInt(formData.lowStockThreshold),
     });
+    setIsSaving(false);
+
+    if (success) {
+      setIsEditDialogOpen(false);
+      setSelectedProduct(null);
+      resetForm();
+      toast({
+        title: "Product Updated",
+        description: `${formData.name} has been updated`,
+      });
+    }
   };
 
-  const handleDeleteProduct = () => {
+  const handleDeleteProduct = async () => {
     if (!selectedProduct) return;
     
-    setProducts(products.filter(p => p.id !== selectedProduct.id));
-    setIsDeleteDialogOpen(false);
-    toast({
-      title: "Product Deleted",
-      description: `${selectedProduct.name} has been removed from inventory`,
-    });
-    setSelectedProduct(null);
+    setIsSaving(true);
+    const success = await deleteProduct(selectedProduct.id);
+    setIsSaving(false);
+
+    if (success) {
+      setIsDeleteDialogOpen(false);
+      toast({
+        title: "Product Deleted",
+        description: `${selectedProduct.name} has been removed from inventory`,
+      });
+      setSelectedProduct(null);
+    }
   };
 
   const openEditDialog = (product: Product) => {
@@ -260,7 +202,16 @@ export default function Stock() {
 
   const handleExportPDF = () => {
     try {
-      exportStockToPDF(filteredProducts);
+      const exportData = filteredProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        stock: p.stock,
+        category: p.category,
+        costPrice: p.costPrice,
+        lowStockThreshold: p.lowStockThreshold,
+      }));
+      exportStockToPDF(exportData);
       toast({
         title: "Export Successful",
         description: "Stock report exported as PDF",
@@ -276,7 +227,16 @@ export default function Stock() {
 
   const handleExportExcel = () => {
     try {
-      exportStockToExcel(filteredProducts);
+      const exportData = filteredProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        stock: p.stock,
+        category: p.category,
+        costPrice: p.costPrice,
+        lowStockThreshold: p.lowStockThreshold,
+      }));
+      exportStockToExcel(exportData);
       toast({
         title: "Export Successful",
         description: "Stock report exported as Excel",
@@ -289,6 +249,14 @@ export default function Stock() {
       });
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -413,39 +381,47 @@ export default function Stock() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => {
-                  const status = getStockStatus(product);
-                  return (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>{product.category}</TableCell>
-                      <TableCell>
-                        <span className={`font-medium ${
-                          product.stock <= product.lowStockThreshold 
-                            ? product.stock === 0 ? 'text-destructive' : 'text-warning'
-                            : 'text-success'
-                        }`}>
-                          {product.stock}
-                        </span>
-                      </TableCell>
-                      <TableCell>KSh {product.costPrice}</TableCell>
-                      <TableCell>KSh {product.price}</TableCell>
-                      <TableCell>
-                        <Badge variant={status.variant}>{status.label}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button size="sm" variant="outline" onClick={() => openEditDialog(product)}>
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => openDeleteDialog(product)}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {filteredProducts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No products found. Add your first product to get started.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredProducts.map((product) => {
+                    const status = getStockStatus(product);
+                    return (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell>{product.category}</TableCell>
+                        <TableCell>
+                          <span className={`font-medium ${
+                            product.stock <= product.lowStockThreshold 
+                              ? product.stock === 0 ? 'text-destructive' : 'text-warning'
+                              : 'text-success'
+                          }`}>
+                            {product.stock}
+                          </span>
+                        </TableCell>
+                        <TableCell>KSh {product.costPrice}</TableCell>
+                        <TableCell>KSh {product.price}</TableCell>
+                        <TableCell>
+                          <Badge variant={status.variant}>{status.label}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button size="sm" variant="outline" onClick={() => openEditDialog(product)}>
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => openDeleteDialog(product)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
           </div>
@@ -528,7 +504,10 @@ export default function Stock() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddProduct}>Add Product</Button>
+            <Button onClick={handleAddProduct} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Add Product
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -604,7 +583,10 @@ export default function Stock() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleEditProduct}>Save Changes</Button>
+            <Button onClick={handleEditProduct} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -620,7 +602,8 @@ export default function Stock() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProduct} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={handleDeleteProduct} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
