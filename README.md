@@ -9,7 +9,7 @@ A complete POS and inventory management system designed for small shops in Kenya
 - Sales tracking and reporting
 - M-Pesa payment integration
 - Offline support
-- Multi-language support (English, Swahili, Kikuyu, Kalenjin, Luo)
+- Multi-language support including the following languages: (English, Swahili, Kikuyu, Kalenjin, Luo)
 - PWA (Progressive Web App) capabilities
 
 ## Technologies Used
@@ -21,7 +21,7 @@ A complete POS and inventory management system designed for small shops in Kenya
 - **Payment Integration**: M-Pesa STK Push
 - **Offline Storage**: IndexedDB
 
-## Getting Started
+## How to Getting Started
 
 ### Prerequisites
 
