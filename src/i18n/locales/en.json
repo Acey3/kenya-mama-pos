@@ -85,7 +85,9 @@
     "quantity": "Quantity",
     "price": "Price",
     "completeSale": "Complete Sale",
-    "receipt": "Receipt"
+    "receipt": "Receipt",
+    "noProducts": "No products available. Add products in the Stock page first.",
+    "noMatch": "No products match your search."
   },
   "stock": {
     "title": "Stock Management",
@@ -109,7 +111,17 @@
     "sellingPrice": "Selling Price",
     "currentStock": "Current Stock",
     "lowStockThreshold": "Low Stock Threshold",
-    "inStock": "In Stock"
+    "inStock": "In Stock",
+    "export": "Export",
+    "exportPDF": "Export as PDF",
+    "exportExcel": "Export as Excel",
+    "editProduct": "Edit Product",
+    "deleteProduct": "Delete Product",
+    "confirmDelete": "Are you sure you want to delete this product?",
+    "productAdded": "Product added",
+    "productUpdated": "Product updated",
+    "productDeleted": "Product deleted",
+    "exportSuccess": "Exported successfully"
   },
   "reports": {
     "title": "Reports & Analytics",
@@ -123,7 +135,10 @@
     "profit": "Profit",
     "topProducts": "Top Selling Products",
     "recentTransactions": "Recent Transactions",
-    "businessInsights": "Business Insights"
+    "businessInsights": "Business Insights",
+    "exportPDF": "Export as PDF",
+    "exportExcel": "Export as Excel",
+    "exportSuccess": "Report exported successfully"
   },
   "settings": {
     "title": "Settings",
@@ -140,26 +155,21 @@
     "interfaceLanguage": "Interface Language",
     "timezone": "Timezone",
     "notificationPrefs": "Notification Preferences",
-    "pushNotifications": "Push Notifications",
-    "pushNotificationsDesc": "Receive notifications for important events",
     "lowStockAlerts": "Low Stock Alerts",
-    "lowStockAlertsDesc": "Get notified when products are running low",
-    "dailySummary": "Daily Sales Summary",
-    "dailySummaryDesc": "Receive end-of-day sales reports",
-    "paymentConfirmations": "Payment Confirmations",
-    "paymentConfirmationsDesc": "Get notified when payments are received",
-    "mobileMoneyIntegration": "Mobile Money Integration",
-    "mpesaNumber": "M-Pesa Business Number",
-    "defaultPayment": "Default Payment Method",
-    "systemSettings": "System Settings",
+    "dailySummary": "Daily Summary",
+    "salesNotifications": "Sales Notifications",
+    "paymentMethods": "Payment Methods",
+    "enableMpesa": "Enable M-Pesa",
+    "enableCash": "Enable Cash",
+    "enableCredit": "Enable Credit",
+    "systemPrefs": "System Preferences",
     "offlineMode": "Offline Mode",
-    "offlineModeDesc": "Continue working when internet is unavailable",
     "autoBackup": "Auto Backup",
-    "autoBackupDesc": "Automatically backup data to cloud storage",
-    "backupFrequency": "Backup Frequency",
+    "resetSettings": "Reset Settings",
     "saveSettings": "Save Settings",
-    "saved": "Settings Saved",
-    "savedDescription": "Your settings have been saved successfully"
+    "unsavedChanges": "Unsaved changes",
+    "saving": "Saving...",
+    "settingsSaved": "Settings saved successfully"
   },
   "mpesa": {
     "title": "M-Pesa Payment",
@@ -167,15 +177,15 @@
     "amount": "Amount (KSh)",
     "pay": "Pay with M-Pesa",
     "processing": "Processing...",
-    "checkPhone": "Check your phone for the M-Pesa prompt",
+    "checkPhone": "Check your phone for M-Pesa prompt",
     "success": "Payment successful!",
     "failed": "Payment failed. Please try again.",
     "enterPin": "Enter your M-Pesa PIN on your phone"
   },
   "landing": {
     "heroTitle": "Simple POS for",
-    "heroHighlight": "Kenyan Shopkeepers",
-    "heroDescription": "Track your sales, manage stock, and grow your business with the easiest point-of-sale system designed for small shops in Kenya.",
+    "heroHighlight": "Kenyan Entrepreneurs",
+    "heroDescription": "Track your sales, manage inventory, and grow your business with a simple point-of-sale system designed for small shops in Kenya.",
     "startFree": "Start Free Today",
     "loginToDashboard": "Login to Dashboard",
     "features": "Features",
