@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Save, Store, Globe, Bell, Shield, Smartphone, Check } from "lucide-react";
+// icons
+import { Save, Store, Globe, Bell, Shield, Smartphone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 
-// Settings storage key
-const SETTINGS_KEY = "mama_duka_settings";
+const LS_KEY = "mama_duka_config_v1";
 
+// TODO: Move these types to a separate types file later
 interface SettingsData {
   shopName: string;
   currency: string;
@@ -30,7 +31,7 @@ interface SettingsData {
   backupFrequency: string;
 }
 
-const defaultSettings: SettingsData = {
+const defaults: SettingsData = {
   shopName: "My Shop",
   currency: "KSh",
   language: "en",
@@ -47,346 +48,228 @@ const defaultSettings: SettingsData = {
   backupFrequency: "daily",
 };
 
-export default function Settings() {
+export default function SettingsPage() {
   const { t, i18n } = useTranslation();
-  const [settings, setSettings] = useState<SettingsData>(defaultSettings);
+  const [settings, setSettings] = useState<SettingsData>(defaults);
   const [hasChanges, setHasChanges] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Load settings on mount
   useEffect(() => {
-    const savedSettings = localStorage.getItem(SETTINGS_KEY);
-    if (savedSettings) {
+    const saved = localStorage.getItem(LS_KEY);
+    if (saved) {
       try {
-        const parsed = JSON.parse(savedSettings);
-        setSettings({ ...defaultSettings, ...parsed });
-      } catch (e) {
-        console.error("Failed to parse settings", e);
+        setSettings({ ...defaults, ...JSON.parse(saved) });
+      } catch (err) {
+        console.error("error loading settings", err);
       }
     }
   }, []);
 
-  // Track changes
-  const updateSetting = <K extends keyof SettingsData>(key: K, value: SettingsData[K]) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+  // Simple handler for field updates
+  // had to use 'any' here for the value because types were getting annoying with the Switch component
+  const handleChange = (field: string, val: any) => {
+    setSettings(prev => ({
+        ...prev,
+        [field]: val
+    }));
     setHasChanges(true);
   };
 
-  const handleSaveSettings = async () => {
-    setIsSaving(true);
-    
+  const onSave = async () => {
+    setSaving(true);
+    console.log("Saving settings...", settings); // remove this before deploy
+
     try {
-      // Save to localStorage
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      localStorage.setItem(LS_KEY, JSON.stringify(settings));
       
-      // Apply language change if needed
+      // handle language switch
       if (settings.language !== i18n.language) {
         await i18n.changeLanguage(settings.language);
       }
       
       setHasChanges(false);
       toast({
-        title: t('settings.saved'),
-        description: t('settings.savedDescription'),
+        title: "Success",
+        description: "Settings updated successfully",
       });
-    } catch (error) {
+    } catch (e) {
       toast({
         title: "Error",
-        description: "Failed to save settings. Please try again.",
+        description: "Something went wrong saving.",
         variant: "destructive",
       });
-    } finally {
-      setIsSaving(false);
     }
-  };
-
-  const handleResetSettings = () => {
-    setSettings(defaultSettings);
-    setHasChanges(true);
-    toast({
-      title: "Settings Reset",
-      description: "Settings have been reset to defaults. Click Save to apply.",
-    });
+    
+    setSaving(false);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 p-2">
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">{t('settings.title')}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t('settings.title')}</h1>
           <p className="text-muted-foreground">{t('settings.subtitle')}</p>
         </div>
+        {/* Only show warning if there are unsaved changes */}
         {hasChanges && (
-          <span className="text-sm text-warning">Unsaved changes</span>
+          <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded text-sm font-medium">
+            You have unsaved changes
+          </div>
         )}
       </div>
 
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="general">{t('settings.general')}</TabsTrigger>
-          <TabsTrigger value="notifications">{t('settings.notifications')}</TabsTrigger>
-          <TabsTrigger value="payments">{t('settings.payments')}</TabsTrigger>
-          <TabsTrigger value="system">{t('settings.system')}</TabsTrigger>
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="system">System</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Store className="mr-2 h-5 w-5" />
-                {t('settings.shopInfo')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="shopName">{t('settings.shopName')}</Label>
-                  <Input
-                    id="shopName"
-                    value={settings.shopName}
-                    onChange={(e) => updateSetting('shopName', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="currency">{t('settings.currency')}</Label>
-                  <Select value={settings.currency} onValueChange={(v) => updateSetting('currency', v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="KSh">Kenyan Shilling (KSh)</SelectItem>
-                      <SelectItem value="USD">US Dollar ($)</SelectItem>
-                      <SelectItem value="EUR">Euro (€)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">{t('settings.shopAddress')}</Label>
-                <Input 
-                  id="address" 
-                  placeholder="Enter your shop address"
-                  value={settings.address}
-                  onChange={(e) => updateSetting('address', e.target.value)}
-                />
-              </div>
-            </CardContent>
-          </Card>
+        <div className="mt-4">
+            <TabsContent value="general">
+            <div className="grid gap-4">
+                <Card>
+                    <CardHeader>
+                    <CardTitle className="flex gap-2 items-center">
+                        <Store size={20} />
+                        Store Details
+                    </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-2">
+                            <Label>Shop Name</Label>
+                            <Input 
+                                value={settings.shopName}
+                                onChange={(e) => handleChange('shopName', e.target.value)}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Currency</Label>
+                            <Select 
+                                value={settings.currency} 
+                                onValueChange={(val) => handleChange('currency', val)}
+                            >
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="KSh">KES (Shilling)</SelectItem>
+                                    <SelectItem value="USD">USD ($)</SelectItem>
+                                    <SelectItem value="EUR">EUR (€)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2 md:col-span-2">
+                            <Label>Address</Label>
+                            <Input 
+                                value={settings.address}
+                                placeholder="Nairobi, Kenya..."
+                                onChange={(e) => handleChange('address', e.target.value)}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Globe className="mr-2 h-5 w-5" />
-                {t('settings.language')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="language">{t('settings.interfaceLanguage')}</Label>
-                <Select value={settings.language} onValueChange={(v) => updateSetting('language', v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="sw">Kiswahili</SelectItem>
-                    <SelectItem value="ki">Gĩkũyũ</SelectItem>
-                    <SelectItem value="luo">Dholuo</SelectItem>
-                    <SelectItem value="kln">Kalenjin</SelectItem>
-                    <SelectItem value="kam">Kĩkamba</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="timezone">{t('settings.timezone')}</Label>
-                <Select value={settings.timezone} onValueChange={(v) => updateSetting('timezone', v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EAT">East Africa Time (EAT)</SelectItem>
-                    <SelectItem value="UTC">UTC</SelectItem>
-                    <SelectItem value="GMT">GMT</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex gap-2 items-center">
+                            <Globe size={20} /> 
+                            Localization
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2">
+                         <div className="grid gap-2">
+                            <Label>Language</Label>
+                            <Select 
+                                value={settings.language} 
+                                onValueChange={(val) => handleChange('language', val)}
+                            >
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="en">English</SelectItem>
+                                    <SelectItem value="sw">Kiswahili</SelectItem>
+                                    <SelectItem value="ki">Gĩkũyũ</SelectItem>
+                                    <SelectItem value="luo">Dholuo</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+            </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Bell className="mr-2 h-5 w-5" />
-                {t('settings.notificationPrefs')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>{t('settings.pushNotifications')}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings.pushNotificationsDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.notifications}
-                  onCheckedChange={(v) => updateSetting('notifications', v)}
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>{t('settings.lowStockAlerts')}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings.lowStockAlertsDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.lowStockAlert}
-                  onCheckedChange={(v) => updateSetting('lowStockAlert', v)}
-                />
-              </div>
+            <TabsContent value="notifications">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex gap-2 items-center"><Bell size={20}/> Alerts</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <Label>Enable Push Notifications</Label>
+                            <Switch 
+                                checked={settings.notifications}
+                                onCheckedChange={(checked) => handleChange('notifications', checked)}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <Label>Low Stock Alerts</Label>
+                            <Switch 
+                                checked={settings.lowStockAlert}
+                                onCheckedChange={(c) => handleChange('lowStockAlert', c)}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+            </TabsContent>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>{t('settings.dailySummary')}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings.dailySummaryDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.dailySummary}
-                  onCheckedChange={(v) => updateSetting('dailySummary', v)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>{t('settings.paymentConfirmations')}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings.paymentConfirmationsDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.paymentConfirmations}
-                  onCheckedChange={(v) => updateSetting('paymentConfirmations', v)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="payments" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Smartphone className="mr-2 h-5 w-5" />
-                {t('settings.mobileMoneyIntegration')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>{t('settings.mpesaNumber')}</Label>
-                <Input 
-                  placeholder="Enter your M-Pesa till/paybill number"
-                  value={settings.mpesaNumber}
-                  onChange={(e) => updateSetting('mpesaNumber', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>{t('settings.defaultPayment')}</Label>
-                <Select value={settings.defaultPayment} onValueChange={(v) => updateSetting('defaultPayment', v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="mpesa">M-Pesa</SelectItem>
-                    <SelectItem value="card">Card</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  <strong>Note:</strong> M-Pesa integration is configured in sandbox mode for testing.
-                  Contact support to enable live payments.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="system" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Shield className="mr-2 h-5 w-5" />
-                {t('settings.systemSettings')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>{t('settings.offlineMode')}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings.offlineModeDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.offlineMode}
-                  onCheckedChange={(v) => updateSetting('offlineMode', v)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>{t('settings.autoBackup')}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings.autoBackupDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.autoBackup}
-                  onCheckedChange={(v) => updateSetting('autoBackup', v)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t('settings.backupFrequency')}</Label>
-                <Select value={settings.backupFrequency} onValueChange={(v) => updateSetting('backupFrequency', v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hourly">Every Hour</SelectItem>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="pt-4 border-t">
-                <Button variant="outline" onClick={handleResetSettings}>
-                  Reset to Defaults
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            <TabsContent value="payments">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex gap-2 items-center"><Smartphone size={20}/> Mobile Money</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid gap-2">
+                            <Label>M-Pesa Till / Paybill</Label>
+                            <Input 
+                                placeholder="e.g. 543210"
+                                value={settings.mpesaNumber}
+                                onChange={(e) => handleChange('mpesaNumber', e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">Make sure this is a business number, personal numbers won't work with the API.</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            
+            {/* System settings tab */}
+            <TabsContent value="system">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex gap-2 items-center"><Shield size={20}/> Data & Backup</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                         <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <Label>Offline Mode</Label>
+                                <p className="text-xs text-muted-foreground">Cache data locally when internet is down</p>
+                            </div>
+                            <Switch 
+                                checked={settings.offlineMode}
+                                onCheckedChange={(c) => handleChange('offlineMode', c)}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </div>
       </Tabs>
 
-      <div className="flex justify-end gap-2">
-        <Button onClick={handleSaveSettings} disabled={!hasChanges || isSaving}>
-          {isSaving ? (
-            <>Saving...</>
-          ) : (
-            <>
-              <Save className="mr-2 h-4 w-4" />
-              {t('settings.saveSettings')}
-            </>
-          )}
+      <div className="flex justify-end pt-4">
+        <Button 
+            onClick={onSave} 
+            disabled={!hasChanges || saving}
+            className="w-full md:w-auto"
+        >
+          {saving ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> Save Changes</>}
         </Button>
       </div>
     </div>
