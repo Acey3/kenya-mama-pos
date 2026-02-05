@@ -15,13 +15,13 @@ import { BusinessSetupWizard } from "@/components/BusinessSetupWizard";
 export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { stats, loading, businessId, getRecentTransactions, fetchSales } = useSales();
+  const { stats, loading, businessId, getRecentTransactions, refreshSales } = useSales();
   
   const recentTransactions = getRecentTransactions(5);
 
   // Show setup wizard if no business exists
   if (!loading && !businessId) {
-    return <BusinessSetupWizard onComplete={() => fetchSales()} />;
+    return <BusinessSetupWizard onComplete={() => refreshSales()} />;
   }
 
   const dashboardStats = [
