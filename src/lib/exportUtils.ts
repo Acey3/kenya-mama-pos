@@ -9,6 +9,22 @@ interface ReportData {
   topProducts: { name: string; quantity: number; revenue: number }[];
 }
 
+interface TransactionDetail {
+  id: string;
+  transaction_id: string;
+  total_amount: number;
+  profit: number;
+  payment_method: string;
+  items_count: number;
+  created_at: string;
+  sale_items: {
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+  }[];
+}
+
 export const exportToPDF = (data: ReportData, shopName: string = "Mama Duka") => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -35,7 +51,8 @@ export const exportToPDF = (data: ReportData, shopName: string = "Mama Duka") =>
   doc.text(`Total Sales: KSh ${data.sales.toLocaleString()}`, 20, 65);
   doc.text(`Total Transactions: ${data.transactions}`, 20, 72);
   doc.text(`Total Profit: KSh ${data.profit.toLocaleString()}`, 20, 79);
-  doc.text(`Average Transaction: KSh ${Math.round(data.sales / data.transactions).toLocaleString()}`, 20, 86);
+  const avgTransaction = data.transactions > 0 ? Math.round(data.sales / data.transactions) : 0;
+  doc.text(`Average Transaction: KSh ${avgTransaction.toLocaleString()}`, 20, 86);
   
   // Top Products section
   doc.setFontSize(12);
@@ -70,7 +87,7 @@ export const exportToExcel = (data: ReportData, shopName: string = "Mama Duka") 
     ['Total Sales', `KSh ${data.sales.toLocaleString()}`],
     ['Total Transactions', data.transactions],
     ['Total Profit', `KSh ${data.profit.toLocaleString()}`],
-    ['Average Transaction', `KSh ${Math.round(data.sales / data.transactions).toLocaleString()}`],
+    ['Average Transaction', `KSh ${(data.transactions > 0 ? Math.round(data.sales / data.transactions) : 0).toLocaleString()}`],
   ];
   
   // Top products sheet data
@@ -90,6 +107,149 @@ export const exportToExcel = (data: ReportData, shopName: string = "Mama Duka") 
   
   // Save the file
   XLSX.writeFile(wb, `${shopName}_${data.period}_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+};
+
+// NEW: Export detailed transactions with all items
+export const exportDetailedTransactionsPDF = (
+  transactions: TransactionDetail[],
+  period: string,
+  shopName: string = "Mama Duka"
+) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  
+  // Header
+  doc.setFontSize(20);
+  doc.setTextColor(0, 128, 128);
+  doc.text(shopName, pageWidth / 2, 20, { align: 'center' });
+  
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text(`${period} Detailed Transactions`, pageWidth / 2, 30, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 38, { align: 'center' });
+  doc.text(`Total Transactions: ${transactions.length}`, pageWidth / 2, 44, { align: 'center' });
+  
+  let yPos = 55;
+  
+  transactions.forEach((txn, txnIndex) => {
+    // Check if we need a new page
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
+    // Transaction header
+    doc.setFillColor(240, 240, 240);
+    doc.rect(15, yPos - 4, pageWidth - 30, 8, 'F');
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    const time = new Date(txn.created_at).toLocaleString();
+    const paymentLabel = txn.payment_method === 'mpesa' ? 'M-Pesa' : 'Cash';
+    doc.text(`#${txnIndex + 1} | ${txn.transaction_id} | ${time} | ${paymentLabel}`, 20, yPos);
+    doc.text(`KSh ${Number(txn.total_amount).toLocaleString()}`, pageWidth - 20, yPos, { align: 'right' });
+    yPos += 10;
+    
+    // Items
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    for (const item of txn.sale_items || []) {
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+      doc.text(`  • ${item.product_name}`, 20, yPos);
+      doc.text(`${item.quantity} x KSh ${item.unit_price}`, 110, yPos);
+      doc.text(`KSh ${Number(item.total_price).toLocaleString()}`, pageWidth - 20, yPos, { align: 'right' });
+      yPos += 6;
+    }
+    
+    yPos += 5;
+  });
+  
+  // Footer
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  const totalSales = transactions.reduce((sum, t) => sum + Number(t.total_amount), 0);
+  doc.text(`Total Revenue: KSh ${totalSales.toLocaleString()}`, pageWidth / 2, yPos + 10, { align: 'center' });
+  
+  doc.save(`${shopName}_${period}_Transactions_${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
+export const exportDetailedTransactionsExcel = (
+  transactions: TransactionDetail[],
+  topProducts: { name: string; quantity: number; revenue: number }[],
+  period: string,
+  shopName: string = "Mama Duka"
+) => {
+  // Transactions summary sheet
+  const txnSummary = [
+    ['Transaction ID', 'Date/Time', 'Payment Method', 'Items Count', 'Total Amount', 'Profit'],
+    ...transactions.map(t => [
+      t.transaction_id,
+      new Date(t.created_at).toLocaleString(),
+      t.payment_method === 'mpesa' ? 'M-Pesa' : 'Cash',
+      t.items_count,
+      Number(t.total_amount),
+      Number(t.profit)
+    ])
+  ];
+  
+  // All items detail sheet
+  const itemsDetail: (string | number)[][] = [
+    ['Transaction ID', 'Date/Time', 'Product Name', 'Quantity', 'Unit Price', 'Total Price', 'Payment Method']
+  ];
+  
+  for (const txn of transactions) {
+    for (const item of txn.sale_items || []) {
+      itemsDetail.push([
+        txn.transaction_id,
+        new Date(txn.created_at).toLocaleString(),
+        item.product_name,
+        item.quantity,
+        Number(item.unit_price),
+        Number(item.total_price),
+        txn.payment_method === 'mpesa' ? 'M-Pesa' : 'Cash'
+      ]);
+    }
+  }
+  
+  // Top products sheet
+  const topProductsData = [
+    ['Rank', 'Product Name', 'Quantity Sold', 'Revenue'],
+    ...topProducts.map((p, i) => [i + 1, p.name, p.quantity, Number(p.revenue)])
+  ];
+  
+  // Summary stats
+  const totalSales = transactions.reduce((sum, t) => sum + Number(t.total_amount), 0);
+  const totalProfit = transactions.reduce((sum, t) => sum + Number(t.profit), 0);
+  const mpesaCount = transactions.filter(t => t.payment_method === 'mpesa').length;
+  const cashCount = transactions.filter(t => t.payment_method === 'cash').length;
+  
+  const summarySheet = [
+    ['Shop Name', shopName],
+    ['Report Period', period],
+    ['Generated', new Date().toLocaleString()],
+    [''],
+    ['Summary Statistics'],
+    ['Total Transactions', transactions.length],
+    ['Total Sales', totalSales],
+    ['Total Profit', totalProfit],
+    ['M-Pesa Transactions', mpesaCount],
+    ['Cash Transactions', cashCount],
+  ];
+  
+  const wb = XLSX.utils.book_new();
+  
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summarySheet), 'Summary');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(txnSummary), 'Transactions');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(itemsDetail), 'All Items Sold');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(topProductsData), 'Top Products');
+  
+  XLSX.writeFile(wb, `${shopName}_${period}_Detailed_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
 };
 
 interface ProductData {

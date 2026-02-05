@@ -20,6 +20,16 @@ export interface SaleItem {
   total_price: number;
 }
 
+export interface SaleWithItems extends Sale {
+  sale_items: SaleItem[];
+}
+
+export interface TopProduct {
+  name: string;
+  quantity: number;
+  revenue: number;
+}
+
 export interface SalesStats {
   todaySales: number;
   todayTransactions: number;
@@ -43,6 +53,8 @@ export function useSales() {
   const { user } = useAuth();
   const [businessId, setBusinessId] = useState<string | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [salesWithItems, setSalesWithItems] = useState<SaleWithItems[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   
   // Initialize with zeros
   const [stats, setStats] = useState<SalesStats>({
@@ -74,29 +86,57 @@ export function useSales() {
     if (!businessId) return;
 
     setLoading(true);
-    // console.log("Fetching sales for:", businessId);
 
     try {
         const now = new Date();
-        // Native JS date math is annoying, but this works for "start of month"
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
+        // Fetch sales with their items for detailed reports
         const { data, error } = await supabase
             .from('sales')
-            .select('*')
+            .select(`
+              *,
+              sale_items (
+                product_name,
+                quantity,
+                unit_price,
+                total_price
+              )
+            `)
             .eq('business_id', businessId)
             .gte('created_at', startOfMonth)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        const allSales = data || [];
-        setSales(allSales);
+        const allSales = (data || []) as SaleWithItems[];
+        setSalesWithItems(allSales);
+        setSales(allSales.map(({ sale_items, ...sale }) => sale));
+
+        // Calculate top products from sale_items
+        const productMap = new Map<string, { quantity: number; revenue: number }>();
+        
+        for (const sale of allSales) {
+          for (const item of sale.sale_items || []) {
+            const existing = productMap.get(item.product_name) || { quantity: 0, revenue: 0 };
+            productMap.set(item.product_name, {
+              quantity: existing.quantity + item.quantity,
+              revenue: existing.revenue + Number(item.total_price)
+            });
+          }
+        }
+        
+        // Sort by revenue and take top 5
+        const sortedProducts = Array.from(productMap.entries())
+          .map(([name, data]) => ({ name, ...data }))
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5);
+        
+        setTopProducts(sortedProducts);
 
         // Filter dates locally to save DB calls
-        const todayStr = new Date().toISOString().split('T')[0]; // "2024-01-20"
+        const todayStr = new Date().toISOString().split('T')[0];
         
-        // Simple "start of week" (Sunday) calculation
         const today = new Date();
         const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
         startOfWeek.setHours(0,0,0,0);
@@ -104,7 +144,6 @@ export function useSales() {
         const todayData = allSales.filter(s => s.created_at.startsWith(todayStr));
         const weeklyData = allSales.filter(s => new Date(s.created_at) >= startOfWeek);
 
-        // DRY implementation (Don't Repeat Yourself)
         const t = getTotals(todayData);
         const w = getTotals(weeklyData);
         const m = getTotals(allSales);
@@ -126,6 +165,38 @@ export function useSales() {
     fetchSales();
   }, [fetchSales]);
 
+  // Real-time subscription for live updates
+  useEffect(() => {
+    if (!businessId) return;
+
+    console.log('Setting up realtime subscription for sales...');
+    
+    const channel = supabase
+      .channel('sales-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sales',
+          filter: `business_id=eq.${businessId}`
+        },
+        (payload) => {
+          console.log('Realtime update received:', payload);
+          // Refetch all data to ensure consistency
+          fetchSales();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+      });
+
+    return () => {
+      console.log('Cleaning up realtime subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [businessId, fetchSales]);
+
   const recordSale = async (
     transactionId: string,
     totalAmount: number,
@@ -139,7 +210,6 @@ export function useSales() {
     }
 
     try {
-      // 1. Create the main sale record
       const { data: sale, error: saleError } = await supabase
         .from('sales')
         .insert({
@@ -155,8 +225,6 @@ export function useSales() {
 
       if (saleError) throw saleError;
 
-      // 2. Add the individual items
-      // Mapping this explicitly to match DB columns
       const saleItemsPayload = items.map(item => ({
         sale_id: sale.id,
         product_name: item.product_name,
@@ -171,7 +239,7 @@ export function useSales() {
 
       if (itemsError) throw itemsError;
 
-      // Update UI immediately
+      // Realtime will trigger refresh, but also do it manually for immediate feedback
       fetchSales();
       return true;
 
@@ -187,18 +255,70 @@ export function useSales() {
       items: `${sale.items_count} items`,
       amount: Number(sale.total_amount),
       method: sale.payment_method === 'mpesa' ? 'M-Pesa' : 'Cash',
-      // simple formatter
       time: new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }));
+  };
+
+  // Get today's transactions with full item details
+  const getTodayTransactionsWithItems = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return salesWithItems.filter(s => s.created_at.startsWith(todayStr));
+  };
+
+  // Get filtered transactions by period
+  const getTransactionsByPeriod = (period: 'daily' | 'weekly' | 'monthly') => {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0,0,0,0);
+
+    switch (period) {
+      case 'daily':
+        return salesWithItems.filter(s => s.created_at.startsWith(todayStr));
+      case 'weekly':
+        return salesWithItems.filter(s => new Date(s.created_at) >= startOfWeek);
+      case 'monthly':
+        return salesWithItems;
+      default:
+        return salesWithItems;
+    }
+  };
+
+  // Get top products for a specific period
+  const getTopProductsByPeriod = (period: 'daily' | 'weekly' | 'monthly') => {
+    const transactions = getTransactionsByPeriod(period);
+    const productMap = new Map<string, { quantity: number; revenue: number }>();
+    
+    for (const sale of transactions) {
+      for (const item of sale.sale_items || []) {
+        const existing = productMap.get(item.product_name) || { quantity: 0, revenue: 0 };
+        productMap.set(item.product_name, {
+          quantity: existing.quantity + item.quantity,
+          revenue: existing.revenue + Number(item.total_price)
+        });
+      }
+    }
+    
+    return Array.from(productMap.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
   };
 
   return {
     businessId,
     sales,
+    salesWithItems,
     stats,
     loading,
+    topProducts,
     recordSale,
     refreshSales: fetchSales,
     getRecentTransactions,
+    getTodayTransactionsWithItems,
+    getTransactionsByPeriod,
+    getTopProductsByPeriod,
   };
 }
