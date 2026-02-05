@@ -10,7 +10,7 @@ const corsHeaders = {
 const CONSUMER_KEY = 'oQYWn49FVLpaKaznCskdC8RRcqWDANbgBQE8lRYATJ4lL0AI';
 const CONSUMER_SECRET = 'VGMe542uvgnCMoc5S31WKXxryluVhVbGGyyOb1108YuseGMGx1hveLP2BbIYMOwr';
 const PASSKEY = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
-const SHORTCODE = '0708374149'; // Sandbox Paybill
+const SHORTCODE = '174379'; // Sandbox Paybill
 const CALLBACK_URL = 'https://htzcagxhnydzqdejpjps.supabase.co/functions/v1/mpesa-callback';
 
 // Toggle this to 'false' when you go live (production)
