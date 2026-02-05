@@ -121,7 +121,8 @@
     "productAdded": "Bidhaa imeongezwa",
     "productUpdated": "Bidhaa imesasishwa",
     "productDeleted": "Bidhaa imefutwa",
-    "exportSuccess": "Imehamishwa vizuri"
+    "exportSuccess": "Imehamishwa vizuri",
+    "All": "Zote"
   },
   "reports": {
     "title": "Ripoti na Uchambuzi",

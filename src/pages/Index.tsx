@@ -72,10 +72,10 @@ const features = [
 ];
 
 const stats = [
-  { label: "Active Shops", value: "2,500+", icon: Users },
-  { label: "Daily Transactions", value: "15,000+", icon: ShoppingCart },
-  { label: "Revenue Tracked", value: "KSh 50M+", icon: DollarSign },
-  { label: "Low Stock Alerts", value: "500+", icon: AlertTriangle },
+  { label: "Active Shops", value: "25+", icon: Users },
+  { label: "Daily Transactions", value: "150+", icon: ShoppingCart },
+  { label: "Revenue Tracked", value: "KSh 50k+", icon: DollarSign },
+  { label: "Low Stock Alerts", value: "50+", icon: AlertTriangle },
 ];
 
 const Index = () => {
@@ -191,7 +191,7 @@ const Index = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Weekly Revenue</p>
-                      <p className="text-2xl font-bold text-foreground">KSh 84,200</p>
+                      <p className="text-2xl font-bold text-foreground">KSh 47,200</p>
                     </div>
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10">
                       <DollarSign className="h-5 w-5 text-accent" />
@@ -206,7 +206,7 @@ const Index = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Items Sold</p>
-                      <p className="text-2xl font-bold text-foreground">342</p>
+                      <p className="text-2xl font-bold text-foreground">42</p>
                     </div>
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                       <ShoppingCart className="h-5 w-5 text-primary" />
@@ -335,7 +335,7 @@ const Index = () => {
                     <Check className="h-6 w-6 text-primary-foreground" />
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground">2,500+ Shops</p>
+                    <p className="font-semibold text-foreground">25+ Shops</p>
                     <p className="text-sm text-muted-foreground">Trust Mama Duka</p>
                   </div>
                 </div>

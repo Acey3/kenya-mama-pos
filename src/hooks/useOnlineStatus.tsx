@@ -3,26 +3,39 @@ import { getPendingSyncCount, getPendingSync, removePendingSync } from '@/lib/of
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+// TODO: move this to types/index.ts
+interface PendingSyncItem {
+  id: string; // or number, depending on your DB
+  table: string;
+  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  data: any; // using any here because the payload structure varies wildly
+}
+
 export function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
+  // defaulting to true to avoid hydration mismatch flickering in Next.js
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+  const [pendingCount, setPendingCount] = useState<number>(0);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const { toast } = useToast();
 
   useEffect(() => {
+    // simple event listeners for network status
     const handleOnline = () => {
       setIsOnline(true);
       toast({
-        title: 'Back Online',
-        description: 'Your connection has been restored',
+        title: 'Connection Restored',
+        description: 'Syncing data...',
+        duration: 3000,
       });
     };
 
     const handleOffline = () => {
       setIsOnline(false);
       toast({
-        title: 'Offline Mode',
-        description: 'You are now working offline. Changes will sync when connected.',
+        title: 'You are offline',
+        description: 'Changes will be saved locally.',
         variant: 'destructive',
       });
     };
@@ -36,15 +49,21 @@ export function useOnlineStatus() {
     };
   }, [toast]);
 
-  // Update pending count periodically
+  // Check for unsynced items every few seconds
+  // TODO: Maybe move this to React Query later? Polling is kinda expensive.
   useEffect(() => {
-    const updatePendingCount = async () => {
-      const count = await getPendingSyncCount();
-      setPendingCount(count);
+    const checkPending = async () => {
+      try {
+        const count = await getPendingSyncCount();
+        setPendingCount(count);
+      } catch (e) {
+        // quiet fail is fine here
+        console.warn("Error checking pending syncs", e);
+      }
     };
 
-    updatePendingCount();
-    const interval = setInterval(updatePendingCount, 5000);
+    checkPending();
+    const interval = setInterval(checkPending, 5000); 
 
     return () => clearInterval(interval);
   }, []);
@@ -53,39 +72,59 @@ export function useOnlineStatus() {
     if (!isOnline || isSyncing) return;
 
     setIsSyncing(true);
+    console.log("Starting sync...");
+
     try {
-      const pendingItems = await getPendingSync();
+      // cast this to our interface so TS doesn't yell at us
+      const pendingItems = (await getPendingSync()) as PendingSyncItem[];
       
+      if (pendingItems.length === 0) {
+        setIsSyncing(false);
+        return;
+      }
+
+      // loop through local items and push to supabase
       for (const item of pendingItems) {
         try {
-          // Process based on type and action
-          // This is a placeholder - actual implementation depends on your tables
-          console.log('Syncing item:', item);
+            const { table, action, data } = item;
+
+            if (action === 'INSERT') {
+                const { error } = await supabase.from(table).insert(data);
+                if (error) throw error;
+            } else if (action === 'UPDATE') {
+                // assuming 'id' is always present in data for updates
+                const { error } = await supabase.from(table).update(data).eq('id', data.id);
+                if (error) throw error;
+            } else {
+                console.warn("Unknown sync action:", action);
+            }
           
-          // After successful sync, remove from pending
-          await removePendingSync(item.id);
-        } catch (error) {
-          console.error('Failed to sync item:', item.id, error);
+            // cleanup local db after success
+            await removePendingSync(item.id);
+
+        } catch (err) {
+          console.error('Failed to sync item:', item.id, err);
+          // continue to next item even if one fails
         }
       }
 
+      // update the badge count
       const newCount = await getPendingSyncCount();
       setPendingCount(newCount);
 
-      if (pendingItems.length > 0) {
-        toast({
-          title: 'Sync Complete',
-          description: `${pendingItems.length} items synced successfully`,
-        });
-      }
+      toast({
+        title: 'Sync Complete',
+        description: `Uploaded ${pendingItems.length} items.`,
+      });
+
     } catch (error) {
-      console.error('Sync failed:', error);
+      console.error('CRITICAL: Sync failed completely:', error);
     } finally {
       setIsSyncing(false);
     }
   }, [isOnline, isSyncing, toast]);
 
-  // Auto-sync when coming back online
+  // Auto-trigger sync when we come back online
   useEffect(() => {
     if (isOnline && pendingCount > 0) {
       syncPendingData();

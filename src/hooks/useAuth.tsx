@@ -9,6 +9,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
+// default context state
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
@@ -19,30 +20,44 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  // Start loading true to avoid "flash of login screen"
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // 1. Setup the live listener first (handles sign-in, sign-out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // console.log("Auth state change:", event); // helpful for debugging
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
       }
     );
 
-    // THEN check for existing session
+    // 2. Check the initial session immediately
+    // (In case the listener takes a few ms to kick in)
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+    }).catch((err) => {
+        // quiet failure is better than infinite loading loop
+        console.error("Auth init error:", err);
+        setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+        subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+        await supabase.auth.signOut();
+        // No need to manually clear state, onAuthStateChange handles it
+    } catch (error) {
+        console.error("Error signing out:", error);
+    }
   };
 
   return (
@@ -54,7 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;

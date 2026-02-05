@@ -13,6 +13,7 @@ export interface Product {
   businessId: string;
 }
 
+// keeping the DB interface separate to avoid type confusion
 interface DBProduct {
   id: string;
   name: string;
@@ -29,10 +30,12 @@ export function useProducts() {
   const [loading, setLoading] = useState(true);
   const [businessId, setBusinessId] = useState<string | null>(null);
 
+  // Memoizing this to avoid infinite loops
   const fetchBusinessId = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
+    // assuming one business per owner for now
     const { data: business } = await supabase
       .from('businesses')
       .select('id')
@@ -46,6 +49,7 @@ export function useProducts() {
     try {
       const bizId = await fetchBusinessId();
       if (!bizId) {
+        console.log("No business ID found, skipping fetch");
         setLoading(false);
         return;
       }
@@ -60,10 +64,11 @@ export function useProducts() {
 
       if (error) throw error;
 
+      // annoying manual mapping because DB uses snake_case
       const mappedProducts: Product[] = (data || []).map((p: DBProduct) => ({
         id: p.id,
         name: p.name,
-        price: Number(p.price),
+        price: Number(p.price), // ensure these are numbers
         costPrice: Number(p.cost_price),
         stock: p.stock,
         category: p.category,
@@ -73,7 +78,7 @@ export function useProducts() {
 
       setProducts(mappedProducts);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('CRITICAL: Failed to fetch products', error);
       toast({
         title: 'Error',
         description: 'Failed to load products',
@@ -90,18 +95,14 @@ export function useProducts() {
 
   const addProduct = async (product: Omit<Product, 'id' | 'businessId'>) => {
     const bizId = businessId || await fetchBusinessId();
+    
     if (!bizId) {
-      toast({
-        title: 'Error',
-        description: 'Please set up your business first',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Business not found. Try reloading.', variant: 'destructive'});
       return null;
     }
 
-    const { data, error } = await supabase
-      .from('products')
-      .insert({
+    // construct payload for DB
+    const payload = {
         name: product.name,
         price: product.price,
         cost_price: product.costPrice,
@@ -109,20 +110,23 @@ export function useProducts() {
         category: product.category,
         low_stock_threshold: product.lowStockThreshold,
         business_id: bizId,
-      })
+    };
+
+    console.log("Adding product:", payload);
+
+    const { data, error } = await supabase
+      .from('products')
+      .insert(payload)
       .select()
       .single();
 
     if (error) {
-      console.error('Error adding product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to add product',
-        variant: 'destructive',
-      });
+      console.error('Insert failed:', error);
+      toast({ title: 'Error', description: 'Could not add product', variant: 'destructive'});
       return null;
     }
 
+    // map back to frontend structure immediately so UI updates fast
     const newProduct: Product = {
       id: data.id,
       name: data.name,
@@ -139,13 +143,18 @@ export function useProducts() {
   };
 
   const updateProduct = async (id: string, updates: Partial<Omit<Product, 'id' | 'businessId'>>) => {
-    const dbUpdates: Record<string, unknown> = {};
-    if (updates.name !== undefined) dbUpdates.name = updates.name;
-    if (updates.price !== undefined) dbUpdates.price = updates.price;
-    if (updates.costPrice !== undefined) dbUpdates.cost_price = updates.costPrice;
-    if (updates.stock !== undefined) dbUpdates.stock = updates.stock;
-    if (updates.category !== undefined) dbUpdates.category = updates.category;
-    if (updates.lowStockThreshold !== undefined) dbUpdates.low_stock_threshold = updates.lowStockThreshold;
+    // Cleaner way to handle partial updates without a million 'if' statements
+    const dbUpdates: any = {
+        name: updates.name,
+        price: updates.price,
+        cost_price: updates.costPrice,
+        stock: updates.stock,
+        category: updates.category,
+        low_stock_threshold: updates.lowStockThreshold
+    };
+
+    // remove undefined keys so we don't accidentally nullify data
+    Object.keys(dbUpdates).forEach(key => dbUpdates[key] === undefined && delete dbUpdates[key]);
 
     const { error } = await supabase
       .from('products')
@@ -153,15 +162,12 @@ export function useProducts() {
       .eq('id', id);
 
     if (error) {
-      console.error('Error updating product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update product',
-        variant: 'destructive',
-      });
+      console.error('Update failed for id:', id, error);
+      toast({ title: 'Error', description: 'Failed to save changes', variant: 'destructive'});
       return false;
     }
 
+    // Optimistic UI update
     setProducts(prev => prev.map(p => 
       p.id === id ? { ...p, ...updates } : p
     ));
@@ -169,22 +175,23 @@ export function useProducts() {
   };
 
   const deleteProduct = async (id: string) => {
+    // Optimistic delete - remove from UI first to feel snappy
+    const previousProducts = [...products];
+    setProducts(prev => prev.filter(p => p.id !== id));
+
     const { error } = await supabase
       .from('products')
       .delete()
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete product',
-        variant: 'destructive',
-      });
+      console.error('Delete failed:', error);
+      // revert UI if DB fails
+      setProducts(previousProducts);
+      toast({ title: 'Error', description: 'Failed to delete product', variant: 'destructive'});
       return false;
     }
 
-    setProducts(prev => prev.filter(p => p.id !== id));
     return true;
   };
 

@@ -5,21 +5,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Safaricom Daraja Sandbox credentials
-const CONSUMER_KEY = 'your_consumer_key';
-const CONSUMER_SECRET = 'your_consumer_secret';
+
+//keys provided for Sandbox testing.                    
+const CONSUMER_KEY = 'oQYWn49FVLpaKaznCskdC8RRcqWDANbgBQE8lRYATJ4lL0AI';
+const CONSUMER_SECRET = 'VGMe542uvgnCMoc5S31WKXxryluVhVbGGyyOb1108YuseGMGx1hveLP2BbIYMOwr';
 const PASSKEY = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
-const SHORTCODE = '174379';
+const SHORTCODE = '0715603106'; // Sandbox Paybill
 const CALLBACK_URL = 'https://htzcagxhnydzqdejpjps.supabase.co/functions/v1/mpesa-callback';
 
-// Sandbox URLs
-const AUTH_URL = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
-const STK_URL = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
+// Toggle this to 'false' when you go live (production)
+const IS_SANDBOX = true; 
+const BASE_URL = IS_SANDBOX ? 'https://sandbox.safaricom.co.ke' : 'https://api.safaricom.co.ke';
 
 async function getAccessToken(): Promise<string> {
   const credentials = btoa(`${CONSUMER_KEY}:${CONSUMER_SECRET}`);
   
-  const response = await fetch(AUTH_URL, {
+  const response = await fetch(`${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`, {
     method: 'GET',
     headers: {
       'Authorization': `Basic ${credentials}`,
@@ -27,7 +28,9 @@ async function getAccessToken(): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error('Failed to get access token');
+    const errorText = await response.text();
+    console.error("Auth Error:", errorText);
+    throw new Error('Failed to get M-Pesa access token');
   }
 
   const data = await response.json();
@@ -45,49 +48,31 @@ function generateTimestamp(): string {
   return `${year}${month}${day}${hour}${minute}${second}`;
 }
 
-function generatePassword(timestamp: string): string {
-  const data = `${SHORTCODE}${PASSKEY}${timestamp}`;
-  return btoa(data);
-}
-
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { phoneNumber, amount } = await req.json();
-
-    console.log('M-Pesa STK Push request:', { phoneNumber, amount });
+    console.log('Initiating STK Push for:', { phoneNumber, amount });
 
     if (!phoneNumber || !amount) {
-      return new Response(
-        JSON.stringify({ success: false, message: 'Phone number and amount are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      throw new Error('Phone number and amount are required');
     }
 
-    // For sandbox testing, simulate successful response
-    // In production, uncomment the actual API call below
-    
-    const mockTransactionId = `MPESA${Date.now()}`;
-    console.log('Sandbox mode: Simulating successful STK push');
-    
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'STK Push sent successfully (Sandbox Mode)',
-        transactionId: mockTransactionId,
-        checkoutRequestId: mockTransactionId,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-    /* Production code - uncomment when you have real credentials:
+    // 1. Get Access Token
     const accessToken = await getAccessToken();
+    console.log("Access Token received");
+
+    // 2. Prepare Password
     const timestamp = generateTimestamp();
-    const password = generatePassword(timestamp);
+    const password = btoa(`${SHORTCODE}${PASSKEY}${timestamp}`);
+
+    // 3. Prepare Payload
+    // Note: Sandbox PartyB is often the Shortcode.
+    // Ensure phoneNumber starts with 254 (no +)
+    const formattedPhone = phoneNumber.replace('+', '').replace(/^0/, '254');
 
     const stkPayload = {
       BusinessShortCode: SHORTCODE,
@@ -95,15 +80,16 @@ serve(async (req) => {
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
       Amount: Math.round(amount),
-      PartyA: phoneNumber,
-      PartyB: SHORTCODE,
-      PhoneNumber: phoneNumber,
+      PartyA: formattedPhone,
+      PartyB: SHORTCODE, 
+      PhoneNumber: formattedPhone,
       CallBackURL: CALLBACK_URL,
       AccountReference: 'MamaDuka',
-      TransactionDesc: 'Payment for goods',
+      TransactionDesc: 'POS Payment',
     };
 
-    const stkResponse = await fetch(STK_URL, {
+    // 4. Send Request
+    const stkResponse = await fetch(`${BASE_URL}/mpesa/stkpush/v1/processrequest`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -113,7 +99,7 @@ serve(async (req) => {
     });
 
     const stkResult = await stkResponse.json();
-    console.log('STK Push response:', stkResult);
+    console.log('STK Response:', stkResult);
 
     if (stkResult.ResponseCode === '0') {
       return new Response(
@@ -121,7 +107,7 @@ serve(async (req) => {
           success: true,
           message: 'STK Push sent successfully',
           checkoutRequestId: stkResult.CheckoutRequestID,
-          transactionId: stkResult.MerchantRequestID,
+          merchantRequestId: stkResult.MerchantRequestID,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -130,13 +116,14 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           message: stkResult.errorMessage || 'STK Push failed',
+          details: stkResult
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    */
+
   } catch (error) {
-    console.error('M-Pesa STK Push error:', error);
+    console.error('M-Pesa Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({ success: false, message: errorMessage }),
