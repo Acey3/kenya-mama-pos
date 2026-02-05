@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, TrendingUp, DollarSign, ShoppingCart, FileText, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Download, TrendingUp, DollarSign, ShoppingCart, FileText, FileSpreadsheet, Loader2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,24 +10,34 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { exportToPDF, exportToExcel } from "@/lib/exportUtils";
-import { useSales } from "@/hooks/useSales";
+import { exportToPDF, exportToExcel, exportDetailedTransactionsPDF, exportDetailedTransactionsExcel } from "@/lib/exportUtils";
+import { useSales, SaleWithItems } from "@/hooks/useSales";
 import { toast } from "@/hooks/use-toast";
-
-// Placeholder top products (would come from sale_items aggregation in a full implementation)
-const topProductsPlaceholder = [
-  { name: "Coca Cola 500ml", quantity: 25, revenue: 2000 },
-  { name: "White Bread", quantity: 20, revenue: 1200 },
-  { name: "Milk 1L", quantity: 15, revenue: 1650 },
-];
 
 export default function Reports() {
   const { t } = useTranslation();
-  const { stats, loading, getRecentTransactions } = useSales();
+  const { 
+    stats, 
+    loading, 
+    getRecentTransactions, 
+    getTransactionsByPeriod, 
+    getTopProductsByPeriod,
+    refreshSales 
+  } = useSales();
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [lastUpdated, setLastUpdated] = useState(new Date());
   
+  // Update timestamp whenever stats change (realtime updates)
+  useEffect(() => {
+    setLastUpdated(new Date());
+  }, [stats]);
+
   const recentTransactions = getRecentTransactions(5);
+  const periodTransactions = getTransactionsByPeriod(selectedPeriod);
+  const topProducts = getTopProductsByPeriod(selectedPeriod);
 
   const getSalesDataForPeriod = () => {
     switch (selectedPeriod) {
@@ -36,21 +46,18 @@ export default function Reports() {
           sales: stats.todaySales,
           transactions: stats.todayTransactions,
           profit: stats.todayProfit,
-          topProducts: topProductsPlaceholder,
         };
       case 'weekly':
         return {
           sales: stats.weeklySales,
           transactions: stats.weeklyTransactions,
           profit: stats.weeklyProfit,
-          topProducts: topProductsPlaceholder,
         };
       case 'monthly':
         return {
           sales: stats.monthlySales,
           transactions: stats.monthlyTransactions,
           profit: stats.monthlyProfit,
-          topProducts: topProductsPlaceholder,
         };
     }
   };
@@ -65,15 +72,15 @@ export default function Reports() {
         sales: currentData.sales,
         transactions: currentData.transactions,
         profit: currentData.profit,
-        topProducts: currentData.topProducts,
+        topProducts: topProducts,
       });
       toast({
-        title: "Export Successful",
+        title: t('reports.exportSuccess'),
         description: `${periodLabel} report exported as PDF`,
       });
     } catch (error) {
       toast({
-        title: "Export Failed",
+        title: t('reports.exportFailed'),
         description: "Failed to export PDF. Please try again.",
         variant: "destructive",
       });
@@ -87,19 +94,66 @@ export default function Reports() {
         sales: currentData.sales,
         transactions: currentData.transactions,
         profit: currentData.profit,
-        topProducts: currentData.topProducts,
+        topProducts: topProducts,
       });
       toast({
-        title: "Export Successful",
+        title: t('reports.exportSuccess'),
         description: `${periodLabel} report exported as Excel`,
       });
     } catch (error) {
       toast({
-        title: "Export Failed",
+        title: t('reports.exportFailed'),
         description: "Failed to export Excel. Please try again.",
         variant: "destructive",
       });
     }
+  };
+
+  const handleExportDetailedPDF = () => {
+    try {
+      exportDetailedTransactionsPDF(
+        periodTransactions as SaleWithItems[],
+        periodLabel
+      );
+      toast({
+        title: t('reports.exportSuccess'),
+        description: `${periodLabel} detailed transactions exported as PDF`,
+      });
+    } catch (error) {
+      toast({
+        title: t('reports.exportFailed'),
+        description: "Failed to export. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportDetailedExcel = () => {
+    try {
+      exportDetailedTransactionsExcel(
+        periodTransactions as SaleWithItems[],
+        topProducts,
+        periodLabel
+      );
+      toast({
+        title: t('reports.exportSuccess'),
+        description: `${periodLabel} detailed report with all items exported`,
+      });
+    } catch (error) {
+      toast({
+        title: t('reports.exportFailed'),
+        description: "Failed to export. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRefresh = () => {
+    refreshSales();
+    toast({
+      title: "Refreshing...",
+      description: "Fetching latest sales data",
+    });
   };
 
   if (loading) {
@@ -116,28 +170,47 @@ export default function Reports() {
         <div>
           <h1 className="text-3xl font-bold">{t('reports.title')}</h1>
           <p className="text-muted-foreground">{t('reports.subtitle')}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            🔴 Live • Last updated: {lastUpdated.toLocaleTimeString()}
+          </p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              {t('reports.exportReport')}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleExportPDF}>
-              <FileText className="mr-2 h-4 w-4" />
-              Export as PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportExcel}>
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Export as Excel
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                {t('reports.exportReport')}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Summary Report</DropdownMenuLabel>
+              <DropdownMenuItem onClick={handleExportPDF}>
+                <FileText className="mr-2 h-4 w-4" />
+                Summary PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportExcel}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Summary Excel
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Detailed Transactions</DropdownMenuLabel>
+              <DropdownMenuItem onClick={handleExportDetailedPDF}>
+                <FileText className="mr-2 h-4 w-4" />
+                All Transactions PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportDetailedExcel}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Full Report with Items (Excel)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      <Tabs value={selectedPeriod} onValueChange={setSelectedPeriod as any}>
+      <Tabs value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as 'daily' | 'weekly' | 'monthly')}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="daily">{t('reports.daily')}</TabsTrigger>
           <TabsTrigger value="weekly">{t('reports.weekly')}</TabsTrigger>
@@ -156,7 +229,7 @@ export default function Reports() {
                 <div className="text-2xl font-bold text-primary">
                   KSh {currentData.sales.toLocaleString()}
                 </div>
-                <p className="text-xs text-success">+12% from last {selectedPeriod.slice(0, -2)}</p>
+                <p className="text-xs text-muted-foreground">{currentData.transactions} transactions</p>
               </CardContent>
             </Card>
 
@@ -167,7 +240,9 @@ export default function Reports() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{currentData.transactions}</div>
-                <p className="text-xs text-success">+8% from last {selectedPeriod.slice(0, -2)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Avg: KSh {currentData.transactions > 0 ? Math.round(currentData.sales / currentData.transactions).toLocaleString() : 0}
+                </p>
               </CardContent>
             </Card>
 
@@ -180,71 +255,93 @@ export default function Reports() {
                 <div className="text-2xl font-bold text-success">
                   KSh {currentData.profit.toLocaleString()}
                 </div>
-                <p className="text-xs text-success">+15% from last {selectedPeriod.slice(0, -2)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {currentData.sales > 0 ? Math.round((currentData.profit / currentData.sales) * 100) : 0}% margin
+                </p>
               </CardContent>
             </Card>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Top Products */}
+            {/* Top Products - Dynamic */}
             <Card>
               <CardHeader>
-                <CardTitle>{t('reports.topProducts')} ({periodLabel})</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>{t('reports.topProducts')} ({periodLabel})</span>
+                  <Badge variant="outline" className="text-xs">Live</Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {currentData.topProducts.map((product, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <Badge variant="secondary">{index + 1}</Badge>
-                        <div>
-                          <p className="font-medium">{product.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {product.quantity} units sold
-                          </p>
+                {topProducts.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                    <p>No sales data for this period</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {topProducts.map((product, index) => (
+                      <div key={product.name} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <Badge variant="secondary">{index + 1}</Badge>
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {product.quantity} units sold
+                            </p>
+                          </div>
                         </div>
+                        <p className="font-bold text-primary">
+                          KSh {product.revenue.toLocaleString()}
+                        </p>
                       </div>
-                      <p className="font-bold text-primary">
-                        KSh {product.revenue.toLocaleString()}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             {/* Recent Transactions */}
             <Card>
               <CardHeader>
-                <CardTitle>{t('reports.recentTransactions')}</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>{t('reports.recentTransactions')}</span>
+                  <Badge variant="outline" className="text-xs">Live</Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {recentTransactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{transaction.items}</p>
-                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                          <span>{transaction.time}</span>
-                          <Badge 
-                            variant={transaction.method === "M-Pesa" ? "default" : "secondary"}
-                            className="text-xs"
-                          >
-                            {transaction.method}
-                          </Badge>
+                {recentTransactions.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                    <p>No recent transactions</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentTransactions.map((transaction) => (
+                      <div key={transaction.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{transaction.items}</p>
+                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                            <span>{transaction.time}</span>
+                            <Badge 
+                              variant={transaction.method === "M-Pesa" ? "default" : "secondary"}
+                              className="text-xs"
+                            >
+                              {transaction.method}
+                            </Badge>
+                          </div>
                         </div>
+                        <p className="font-bold text-primary">
+                          KSh {transaction.amount.toLocaleString()}
+                        </p>
                       </div>
-                      <p className="font-bold text-primary">
-                        KSh {transaction.amount}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Additional Insights */}
+          {/* Payment Methods Breakdown */}
           <Card>
             <CardHeader>
               <CardTitle>{t('reports.businessInsights')}</CardTitle>
@@ -254,17 +351,19 @@ export default function Reports() {
                 <div className="space-y-2">
                   <h4 className="font-semibold text-success">💰 Revenue Highlights</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Beverages account for 40% of total sales</li>
-                    <li>• M-Pesa payments increased by 25%</li>
-                    <li>• Average transaction value: KSh {Math.round(currentData.sales / currentData.transactions)}</li>
+                    {topProducts.length > 0 && (
+                      <li>• Top seller: {topProducts[0].name} ({topProducts[0].quantity} units)</li>
+                    )}
+                    <li>• Total products sold: {periodTransactions.reduce((sum, t) => sum + t.items_count, 0)} items</li>
+                    <li>• Average transaction: KSh {currentData.transactions > 0 ? Math.round(currentData.sales / currentData.transactions).toLocaleString() : 0}</li>
                   </ul>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-warning">⚠️ Areas for Improvement</h4>
+                  <h4 className="font-semibold text-primary">📱 Payment Methods</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• 5 products are running low on stock</li>
-                    <li>• Peak sales time: 10 AM - 2 PM</li>
-                    <li>• Consider stocking more dairy products</li>
+                    <li>• M-Pesa: {periodTransactions.filter(t => t.payment_method === 'mpesa').length} transactions</li>
+                    <li>• Cash: {periodTransactions.filter(t => t.payment_method === 'cash').length} transactions</li>
+                    <li>• M-Pesa revenue: KSh {periodTransactions.filter(t => t.payment_method === 'mpesa').reduce((sum, t) => sum + Number(t.total_amount), 0).toLocaleString()}</li>
                   </ul>
                 </div>
               </div>
