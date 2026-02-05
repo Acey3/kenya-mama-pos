@@ -3,12 +3,13 @@ import { getPendingSyncCount, getPendingSync, removePendingSync } from '@/lib/of
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-// TODO: move this to types/index.ts
+// Matches the PendingSync type from offlineDb.ts
 interface PendingSyncItem {
-  id: string; // or number, depending on your DB
-  table: string;
-  action: 'INSERT' | 'UPDATE' | 'DELETE';
-  data: any; // using any here because the payload structure varies wildly
+  id: string;
+  type: 'sale' | 'stock' | 'customer';
+  action: 'create' | 'update' | 'delete';
+  data: any;
+  timestamp: number;
 }
 
 export function useOnlineStatus() {
@@ -86,14 +87,24 @@ export function useOnlineStatus() {
       // loop through local items and push to supabase
       for (const item of pendingItems) {
         try {
-            const { table, action, data } = item;
+            const { type, action, data } = item;
+            
+            // Map type to table name
+            const tableMap: Record<string, string> = {
+              sale: 'sales',
+              stock: 'products', 
+              customer: 'profiles'
+            };
+            const tableName = tableMap[type] || type;
 
-            if (action === 'INSERT') {
-                const { error } = await supabase.from(table).insert(data);
+            if (action === 'create') {
+                const { error } = await supabase.from(tableName as 'sales').insert(data);
                 if (error) throw error;
-            } else if (action === 'UPDATE') {
-                // assuming 'id' is always present in data for updates
-                const { error } = await supabase.from(table).update(data).eq('id', data.id);
+            } else if (action === 'update') {
+                const { error } = await supabase.from(tableName as 'sales').update(data).eq('id', data.id);
+                if (error) throw error;
+            } else if (action === 'delete') {
+                const { error } = await supabase.from(tableName as 'sales').delete().eq('id', data.id);
                 if (error) throw error;
             } else {
                 console.warn("Unknown sync action:", action);
