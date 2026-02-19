@@ -15,6 +15,7 @@ import {
 import { MpesaPayment } from "@/components/MpesaPayment";
 import { generateReceipt } from "@/lib/exportUtils";
 import { useSales } from "@/hooks/useSales";
+import { useBusiness } from "@/hooks/useBusiness";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { toast } from "@/hooks/use-toast";
 
@@ -25,6 +26,7 @@ interface CartItem extends Product {
 export default function Sales() {
   const { t } = useTranslation();
   const { recordSale } = useSales();
+  const { businessName } = useBusiness();
   const { products, loading, updateStock } = useProducts();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -92,7 +94,7 @@ export default function Sales() {
         price: item.price,
       }));
       
-      const transactionId = generateReceipt(items, total, paymentMethod === 'cash' ? 'Cash' : 'M-Pesa');
+      const transactionId = generateReceipt(items, total, paymentMethod === 'cash' ? 'Cash' : 'M-Pesa', businessName);
       setLastTransactionId(transactionId);
       setLastTotal(total);
       
@@ -155,7 +157,7 @@ export default function Sales() {
         quantity: item.quantity,
         price: item.price,
       }));
-      generateReceipt(items, total, "Cash");
+      generateReceipt(items, total, "Cash", businessName);
       toast({
         title: "Receipt Generated",
         description: "Receipt PDF has been downloaded",

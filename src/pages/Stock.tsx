@@ -47,12 +47,14 @@ import {
 import { exportStockToPDF, exportStockToExcel } from "@/lib/exportUtils";
 import { toast } from "@/hooks/use-toast";
 import { useProducts, Product } from "@/hooks/useProducts";
+import { useBusiness } from "@/hooks/useBusiness";
 
 const categoryOptions = ["Beverages", "Bakery", "Dairy", "Grocery", "Household", "Snacks"];
 
 export default function Stock() {
   const { t } = useTranslation();
   const { products, loading, addProduct, updateProduct, deleteProduct } = useProducts();
+  const { businessName } = useBusiness();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   
@@ -211,7 +213,7 @@ export default function Stock() {
         costPrice: p.costPrice,
         lowStockThreshold: p.lowStockThreshold,
       }));
-      exportStockToPDF(exportData);
+      exportStockToPDF(exportData, businessName);
       toast({
         title: "Export Successful",
         description: "Stock report exported as PDF",
@@ -236,7 +238,7 @@ export default function Stock() {
         costPrice: p.costPrice,
         lowStockThreshold: p.lowStockThreshold,
       }));
-      exportStockToExcel(exportData);
+      exportStockToExcel(exportData, businessName);
       toast({
         title: "Export Successful",
         description: "Stock report exported as Excel",

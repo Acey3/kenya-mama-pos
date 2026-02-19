@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useBusiness } from "@/hooks/useBusiness";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { OnlineStatusIndicator } from "@/components/OnlineStatusIndicator";
 
@@ -21,6 +22,7 @@ export function Layout() {
   const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, loading, signOut } = useAuth();
+  const { businessName } = useBusiness();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -74,7 +76,7 @@ export function Layout() {
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex items-center justify-between h-16 px-4 border-b">
-          <h1 className="text-xl font-bold text-primary">Mama Duka</h1>
+          <h1 className="text-xl font-bold text-primary">{businessName}</h1>
           <Button
             variant="ghost"
             size="sm"

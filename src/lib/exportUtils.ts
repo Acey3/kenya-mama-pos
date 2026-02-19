@@ -70,7 +70,7 @@ export const exportToPDF = (data: ReportData, shopName: string = "Mama Duka") =>
   // Footer
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
-  doc.text('Powered by Mama Duka POS', pageWidth / 2, 280, { align: 'center' });
+  doc.text(`Powered by ${shopName} POS`, pageWidth / 2, 280, { align: 'center' });
   
   // Save the PDF
   doc.save(`${shopName}_${data.period}_Report_${new Date().toISOString().split('T')[0]}.pdf`);
