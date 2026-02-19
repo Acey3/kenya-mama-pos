@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { exportToPDF, exportToExcel, exportDetailedTransactionsPDF, exportDetailedTransactionsExcel } from "@/lib/exportUtils";
 import { useSales, SaleWithItems } from "@/hooks/useSales";
+import { useBusiness } from "@/hooks/useBusiness";
 import { toast } from "@/hooks/use-toast";
 
 export default function Reports() {
@@ -27,6 +28,7 @@ export default function Reports() {
     getTopProductsByPeriod,
     refreshSales 
   } = useSales();
+  const { businessName } = useBusiness();
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [lastUpdated, setLastUpdated] = useState(new Date());
   
@@ -73,7 +75,7 @@ export default function Reports() {
         transactions: currentData.transactions,
         profit: currentData.profit,
         topProducts: topProducts,
-      });
+      }, businessName);
       toast({
         title: t('reports.exportSuccess'),
         description: `${periodLabel} report exported as PDF`,
@@ -95,7 +97,7 @@ export default function Reports() {
         transactions: currentData.transactions,
         profit: currentData.profit,
         topProducts: topProducts,
-      });
+      }, businessName);
       toast({
         title: t('reports.exportSuccess'),
         description: `${periodLabel} report exported as Excel`,
@@ -113,7 +115,8 @@ export default function Reports() {
     try {
       exportDetailedTransactionsPDF(
         periodTransactions as SaleWithItems[],
-        periodLabel
+        periodLabel,
+        businessName
       );
       toast({
         title: t('reports.exportSuccess'),
@@ -133,7 +136,8 @@ export default function Reports() {
       exportDetailedTransactionsExcel(
         periodTransactions as SaleWithItems[],
         topProducts,
-        periodLabel
+        periodLabel,
+        businessName
       );
       toast({
         title: t('reports.exportSuccess'),
