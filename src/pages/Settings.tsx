@@ -11,9 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 
+import { useBusiness } from "@/hooks/useBusiness";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+
 const LS_KEY = "mama_duka_config_v1";
 
-// TODO: Move these types to a separate types file later
 interface SettingsData {
   shopName: string;
   currency: string;
@@ -25,6 +28,13 @@ interface SettingsData {
   dailySummary: boolean;
   paymentConfirmations: boolean;
   mpesaNumber: string;
+  mpesaConsumerKey: string;
+  mpesaConsumerSecret: string;
+  mpesaPasskey: string;
+  isMpesaLive: boolean;
+  paystackPublicKey: string;
+  paystackSecretKey: string;
+  isPaystackLive: boolean;
   defaultPayment: string;
   offlineMode: boolean;
   autoBackup: boolean;
@@ -42,6 +52,13 @@ const defaults: SettingsData = {
   dailySummary: true,
   paymentConfirmations: true,
   mpesaNumber: "",
+  mpesaConsumerKey: "",
+  mpesaConsumerSecret: "",
+  mpesaPasskey: "",
+  isMpesaLive: false,
+  paystackPublicKey: "",
+  paystackSecretKey: "",
+  isPaystackLive: false,
   defaultPayment: "cash",
   offlineMode: true,
   autoBackup: true,
@@ -50,23 +67,38 @@ const defaults: SettingsData = {
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const { businessId, mpesaCredentials, paystackCredentials, businessName, refreshBusiness } = useBusiness();
   const [settings, setSettings] = useState<SettingsData>(defaults);
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Initialize settings once from context/localstorage
   useEffect(() => {
     const saved = localStorage.getItem(LS_KEY);
+    let initial = defaults;
     if (saved) {
       try {
-        setSettings({ ...defaults, ...JSON.parse(saved) });
+        initial = { ...defaults, ...JSON.parse(saved) };
       } catch (err) {
         console.error("error loading settings", err);
       }
     }
-  }, []);
 
-  // Simple handler for field updates
-  // had to use 'any' here for the value because types were getting annoying with the Switch component
+    setSettings({
+      ...initial,
+      shopName: businessName || initial.shopName,
+      mpesaNumber: mpesaCredentials?.shortcode || initial.mpesaNumber,
+      mpesaConsumerKey: mpesaCredentials?.consumerKey || initial.mpesaConsumerKey,
+      mpesaConsumerSecret: mpesaCredentials?.consumerSecret || initial.mpesaConsumerSecret,
+      mpesaPasskey: mpesaCredentials?.passkey || initial.mpesaPasskey,
+      isMpesaLive: mpesaCredentials?.isLive || initial.isMpesaLive,
+      paystackPublicKey: paystackCredentials?.publicKey || initial.paystackPublicKey,
+      paystackSecretKey: paystackCredentials?.secretKey || initial.paystackSecretKey,
+      isPaystackLive: paystackCredentials?.isLive || initial.isPaystackLive,
+    });
+  }, [businessId, mpesaCredentials, paystackCredentials, businessName]);
+
   const handleChange = (field: string, val: any) => {
     setSettings(prev => ({
         ...prev,
@@ -76,13 +108,39 @@ export default function SettingsPage() {
   };
 
   const onSave = async () => {
+    if (!user) {
+        toast({ title: "Error", description: "You must be logged in to save settings.", variant: "destructive" });
+        return;
+    }
+
     setSaving(true);
-    console.log("Saving settings...", settings); // remove this before deploy
 
     try {
+      // 1. Update or Insert into Supabase (Upsert)
+      const { error } = await supabase
+        .from("businesses")
+        .upsert({
+          id: businessId || undefined, 
+          owner_id: user.id,
+          business_name: settings.shopName,
+          mpesa_shortcode: settings.mpesaNumber,
+          mpesa_consumer_key: settings.mpesaConsumerKey,
+          mpesa_consumer_secret: settings.mpesaConsumerSecret,
+          mpesa_passkey: settings.mpesaPasskey,
+          is_mpesa_live: settings.isMpesaLive,
+          paystack_public_key: settings.paystackPublicKey,
+          paystack_secret_key: settings.paystackSecretKey,
+          is_paystack_live: settings.isPaystackLive,
+        }, { onConflict: 'owner_id' }); 
+
+      if (error) throw error;
+      
+      // Force refresh the context to update sidebar
+      await refreshBusiness();
+
+      // 2. Save UI preferences to localStorage
       localStorage.setItem(LS_KEY, JSON.stringify(settings));
       
-      // handle language switch
       if (settings.language !== i18n.language) {
         await i18n.changeLanguage(settings.language);
       }
@@ -92,15 +150,16 @@ export default function SettingsPage() {
         title: "Success",
         description: "Settings updated successfully",
       });
-    } catch (e) {
+    } catch (e: any) {
+      console.error("Save error:", e);
       toast({
         title: "Error",
-        description: "Something went wrong saving.",
+        description: e.message || "Something went wrong saving.",
         variant: "destructive",
       });
+    } finally {
+        setSaving(false);
     }
-    
-    setSaving(false);
   };
 
   return (
@@ -110,38 +169,37 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-bold tracking-tight">{t('settings.title')}</h1>
           <p className="text-muted-foreground">{t('settings.subtitle')}</p>
         </div>
-        {/* Only show warning if there are unsaved changes */}
         {hasChanges && (
-          <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded text-sm font-medium">
+          <div className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-3 py-1 rounded-full text-sm font-medium">
             You have unsaved changes
           </div>
         )}
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="payments">Payments</TabsTrigger>
-          <TabsTrigger value="system">System</TabsTrigger>
+        <TabsList className="w-full justify-start bg-transparent border-b rounded-none h-auto p-0 mb-6">
+          <TabsTrigger value="general" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3">General</TabsTrigger>
+          <TabsTrigger value="notifications" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3">Notifications</TabsTrigger>
+          <TabsTrigger value="payments" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3">Payments</TabsTrigger>
+          <TabsTrigger value="system" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3">System</TabsTrigger>
         </TabsList>
 
         <div className="mt-4">
-            <TabsContent value="general">
-            <div className="grid gap-4">
-                <Card>
+            <TabsContent value="general" className="space-y-4 animate-in fade-in duration-300">
+                <Card className="glass-card">
                     <CardHeader>
                     <CardTitle className="flex gap-2 items-center">
-                        <Store size={20} />
+                        <Store size={20} className="text-primary" />
                         Store Details
                     </CardTitle>
                     </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-2">
+                    <CardContent className="grid gap-6 md:grid-cols-2">
                         <div className="grid gap-2">
                             <Label>Shop Name</Label>
                             <Input 
                                 value={settings.shopName}
                                 onChange={(e) => handleChange('shopName', e.target.value)}
+                                className="bg-background/50"
                             />
                         </div>
                         <div className="grid gap-2">
@@ -150,7 +208,7 @@ export default function SettingsPage() {
                                 value={settings.currency} 
                                 onValueChange={(val) => handleChange('currency', val)}
                             >
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="KSh">KES (Shilling)</SelectItem>
                                     <SelectItem value="USD">USD ($)</SelectItem>
@@ -164,26 +222,27 @@ export default function SettingsPage() {
                                 value={settings.address}
                                 placeholder="Nairobi, Kenya..."
                                 onChange={(e) => handleChange('address', e.target.value)}
+                                className="bg-background/50"
                             />
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="glass-card">
                     <CardHeader>
                         <CardTitle className="flex gap-2 items-center">
-                            <Globe size={20} /> 
+                            <Globe size={20} className="text-primary" /> 
                             Localization
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-2">
+                    <CardContent className="grid gap-6 md:grid-cols-2">
                          <div className="grid gap-2">
                             <Label>Language</Label>
                             <Select 
                                 value={settings.language} 
                                 onValueChange={(val) => handleChange('language', val)}
                             >
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="en">English</SelectItem>
                                     <SelectItem value="sw">Kiswahili</SelectItem>
@@ -194,24 +253,29 @@ export default function SettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
             </TabsContent>
 
-            <TabsContent value="notifications">
-                <Card>
+            <TabsContent value="notifications" className="space-y-4 animate-in fade-in duration-300">
+                <Card className="glass-card">
                     <CardHeader>
-                        <CardTitle className="flex gap-2 items-center"><Bell size={20}/> Alerts</CardTitle>
+                        <CardTitle className="flex gap-2 items-center text-primary"><Bell size={20}/> Alerts</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-6">
                         <div className="flex items-center justify-between">
-                            <Label>Enable Push Notifications</Label>
+                            <div className="space-y-0.5">
+                                <Label>Enable Push Notifications</Label>
+                                <p className="text-xs text-muted-foreground">Receive real-time alerts on your device</p>
+                            </div>
                             <Switch 
                                 checked={settings.notifications}
                                 onCheckedChange={(checked) => handleChange('notifications', checked)}
                             />
                         </div>
                         <div className="flex items-center justify-between">
-                            <Label>Low Stock Alerts</Label>
+                            <div className="space-y-0.5">
+                                <Label>Low Stock Alerts</Label>
+                                <p className="text-xs text-muted-foreground">Notify me when products fall below threshold</p>
+                            </div>
                             <Switch 
                                 checked={settings.lowStockAlert}
                                 onCheckedChange={(c) => handleChange('lowStockAlert', c)}
@@ -221,34 +285,124 @@ export default function SettingsPage() {
                 </Card>
             </TabsContent>
 
-            <TabsContent value="payments">
-                <Card>
+            <TabsContent value="payments" className="space-y-4 animate-in fade-in duration-300">
+                <Card className="glass-card">
                     <CardHeader>
-                        <CardTitle className="flex gap-2 items-center"><Smartphone size={20}/> Mobile Money</CardTitle>
+                        <CardTitle className="flex gap-2 items-center text-primary"><Smartphone size={20}/> Paystack Integration (Recommended)</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid gap-2">
-                            <Label>M-Pesa Till / Paybill</Label>
-                            <Input 
-                                placeholder="e.g. 543210"
-                                value={settings.mpesaNumber}
-                                onChange={(e) => handleChange('mpesaNumber', e.target.value)}
-                            />
-                            <p className="text-xs text-muted-foreground">Make sure this is a business number, personal numbers won't work with the API.</p>
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10">
+                            <div className="space-y-0.5">
+                                <Label className="text-base">Environment</Label>
+                                <p className="text-xs text-muted-foreground">Toggle between Test and Live Paystack API</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className={`text-xs font-bold ${!settings.isPaystackLive ? 'text-blue-500' : 'text-muted-foreground'}`}>TEST</span>
+                                <Switch 
+                                    checked={settings.isPaystackLive}
+                                    onCheckedChange={(c) => handleChange('isPaystackLive', c)}
+                                />
+                                <span className={`text-xs font-bold ${settings.isPaystackLive ? 'text-green-500' : 'text-muted-foreground'}`}>LIVE</span>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-6 md:grid-cols-2">
+                            <div className="grid gap-2">
+                                <Label>Paystack Public Key</Label>
+                                <Input 
+                                    placeholder="pk_test_..."
+                                    value={settings.paystackPublicKey}
+                                    onChange={(e) => handleChange('paystackPublicKey', e.target.value)}
+                                    className="bg-background/50"
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>Paystack Secret Key</Label>
+                                <Input 
+                                    type="password"
+                                    placeholder="sk_test_..."
+                                    value={settings.paystackSecretKey}
+                                    onChange={(e) => handleChange('paystackSecretKey', e.target.value)}
+                                    className="bg-background/50"
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="glass-card opacity-60">
+                    <CardHeader>
+                        <CardTitle className="flex gap-2 items-center text-muted-foreground"><Smartphone size={20}/> Legacy M-Pesa Daraja Integration</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="flex items-center justify-between p-4 bg-muted/20 rounded-xl border border-muted-foreground/10">
+                            <div className="space-y-0.5">
+                                <Label className="text-base">Environment</Label>
+                                <p className="text-xs text-muted-foreground">Toggle between Sandbox and Live M-Pesa API</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className={`text-xs font-bold ${!settings.isMpesaLive ? 'text-blue-500' : 'text-muted-foreground'}`}>SANDBOX</span>
+                                <Switch 
+                                    checked={settings.isMpesaLive}
+                                    onCheckedChange={(c) => handleChange('isMpesaLive', c)}
+                                />
+                                <span className={`text-xs font-bold ${settings.isMpesaLive ? 'text-green-500' : 'text-muted-foreground'}`}>LIVE</span>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-6 md:grid-cols-2">
+                            <div className="grid gap-2">
+                                <Label>M-Pesa Shortcode (Till/Paybill)</Label>
+                                <Input 
+                                    placeholder="e.g. 174379"
+                                    value={settings.mpesaNumber}
+                                    onChange={(e) => handleChange('mpesaNumber', e.target.value)}
+                                    className="bg-background/50"
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>Consumer Key</Label>
+                                <Input 
+                                    type="password"
+                                    placeholder="Enter Daraja Consumer Key"
+                                    value={settings.mpesaConsumerKey}
+                                    onChange={(e) => handleChange('mpesaConsumerKey', e.target.value)}
+                                    className="bg-background/50"
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>Consumer Secret</Label>
+                                <Input 
+                                    type="password"
+                                    placeholder="Enter Daraja Consumer Secret"
+                                    value={settings.mpesaConsumerSecret}
+                                    onChange={(e) => handleChange('mpesaConsumerSecret', e.target.value)}
+                                    className="bg-background/50"
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>Online Passkey (LNM)</Label>
+                                <Input 
+                                    type="password"
+                                    placeholder="Enter Lipa Na M-Pesa Passkey"
+                                    value={settings.mpesaPasskey}
+                                    onChange={(e) => handleChange('mpesaPasskey', e.target.value)}
+                                    className="bg-background/50"
+                                />
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
             </TabsContent>
             
-            {/* System settings tab */}
-            <TabsContent value="system">
-                <Card>
+            <TabsContent value="system" className="space-y-4 animate-in fade-in duration-300">
+                <Card className="glass-card">
                     <CardHeader>
-                        <CardTitle className="flex gap-2 items-center"><Shield size={20}/> Data & Backup</CardTitle>
+                        <CardTitle className="flex gap-2 items-center text-primary"><Shield size={20}/> Data & Backup</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-6">
                          <div className="flex items-center justify-between">
-                            <div className="space-y-1">
+                            <div className="space-y-0.5">
                                 <Label>Offline Mode</Label>
                                 <p className="text-xs text-muted-foreground">Cache data locally when internet is down</p>
                             </div>
@@ -263,13 +417,13 @@ export default function SettingsPage() {
         </div>
       </Tabs>
 
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-end pt-4 sticky bottom-0 bg-background/50 backdrop-blur-sm p-4 border-t z-10">
         <Button 
             onClick={onSave} 
             disabled={!hasChanges || saving}
-            className="w-full md:w-auto"
+            className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 h-11 px-8"
         >
-          {saving ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> Save Changes</>}
+          {saving ? "Saving Changes..." : <><Save className="mr-2 h-4 w-4" /> Save Configuration</>}
         </Button>
       </div>
     </div>

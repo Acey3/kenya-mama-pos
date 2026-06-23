@@ -25,7 +25,7 @@ interface TransactionDetail {
   }[];
 }
 
-export const exportToPDF = (data: ReportData, shopName: string = "Mama Duka") => {
+export const exportToPDF = (data: ReportData, shopName: string = "Mama Duka", returnAsBase64: boolean = false) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   
@@ -72,8 +72,12 @@ export const exportToPDF = (data: ReportData, shopName: string = "Mama Duka") =>
   doc.setTextColor(150, 150, 150);
   doc.text(`Powered by ${shopName} POS`, pageWidth / 2, 280, { align: 'center' });
   
-  // Save the PDF
-  doc.save(`${shopName}_${data.period}_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  if (returnAsBase64) {
+    return doc.output('datauristring');
+  } else {
+    // Save the PDF
+    doc.save(`${shopName}_${data.period}_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  }
 };
 
 export const exportToExcel = (data: ReportData, shopName: string = "Mama Duka") => {
@@ -261,7 +265,7 @@ interface ProductData {
   costPrice: number;
 }
 
-export const exportStockToPDF = (products: ProductData[], shopName: string = "Mama Duka") => {
+export const exportStockToPDF = (products: ProductData[], shopName: string = "Mama Duka", returnAsBase64: boolean = false) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   
@@ -311,7 +315,11 @@ export const exportStockToPDF = (products: ProductData[], shopName: string = "Ma
   doc.text(`Total Products: ${products.length}`, 20, yPos);
   doc.text(`Total Stock Value: KSh ${totalValue.toLocaleString()}`, 20, yPos + 8);
   
-  doc.save(`${shopName}_Stock_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  if (returnAsBase64) {
+    return doc.output('datauristring');
+  } else {
+    doc.save(`${shopName}_Stock_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  }
 };
 
 export const exportStockToExcel = (products: ProductData[], shopName: string = "Mama Duka") => {

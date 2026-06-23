@@ -79,6 +79,7 @@
     "cash": "Cash",
     "mpesa": "M-Pesa",
     "mpesaPayment": "M-Pesa Payment",
+    "onlinePayment": "Online Payment",
     "credit": "Credit",
     "total": "Total",
     "subtotal": "Subtotal",

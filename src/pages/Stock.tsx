@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Edit, Trash2, Search, AlertTriangle, Download, FileText, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, Search, AlertTriangle, Download, FileText, FileSpreadsheet, Loader2, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,8 @@ import { exportStockToPDF, exportStockToExcel } from "@/lib/exportUtils";
 import { toast } from "@/hooks/use-toast";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useBusiness } from "@/hooks/useBusiness";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const categoryOptions = ["Beverages", "Bakery", "Dairy", "Grocery", "Household", "Snacks"];
 
@@ -55,6 +57,7 @@ export default function Stock() {
   const { t } = useTranslation();
   const { products, loading, addProduct, updateProduct, deleteProduct } = useProducts();
   const { businessName } = useBusiness();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   
@@ -64,6 +67,7 @@ export default function Stock() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEmailing, setIsEmailing] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -252,6 +256,52 @@ export default function Stock() {
     }
   };
 
+  const handleEmailStockReport = async () => {
+    if (!user?.email) {
+      toast({ title: "Error", description: "User email not found", variant: "destructive" });
+      return;
+    }
+
+    setIsEmailing(true);
+    try {
+      const exportData = filteredProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        stock: p.stock,
+        category: p.category,
+        costPrice: p.costPrice,
+        lowStockThreshold: p.lowStockThreshold,
+      }));
+      
+      const pdfBase64 = exportStockToPDF(exportData, businessName, true); // true = returnAsBase64
+
+      const { error } = await supabase.functions.invoke('email-report', {
+        body: {
+          pdfBase64: pdfBase64 as string,
+          reportName: `Current Stock Inventory`,
+          userEmail: user.email
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Report Sent",
+        description: `The stock inventory PDF has been sent to ${user.email}`,
+      });
+    } catch (error: any) {
+      console.error("Email error:", error);
+      toast({
+        title: "Email Failed",
+        description: error.message || "Failed to send email.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEmailing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -283,6 +333,10 @@ export default function Stock() {
               <DropdownMenuItem onClick={handleExportExcel}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Export as Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleEmailStockReport} disabled={isEmailing}>
+                {isEmailing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                Email Me This Report
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

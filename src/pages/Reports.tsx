@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, TrendingUp, DollarSign, ShoppingCart, FileText, FileSpreadsheet, Loader2, RefreshCw } from "lucide-react";
+import { Download, TrendingUp, DollarSign, ShoppingCart, FileText, FileSpreadsheet, Loader2, RefreshCw, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +16,8 @@ import {
 import { exportToPDF, exportToExcel, exportDetailedTransactionsPDF, exportDetailedTransactionsExcel } from "@/lib/exportUtils";
 import { useSales, SaleWithItems } from "@/hooks/useSales";
 import { useBusiness } from "@/hooks/useBusiness";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 export default function Reports() {
@@ -29,8 +31,10 @@ export default function Reports() {
     refreshSales 
   } = useSales();
   const { businessName } = useBusiness();
+  const { user } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [isEmailing, setIsEmailing] = useState(false);
   
   // Update timestamp whenever stats change (realtime updates)
   useEffect(() => {
@@ -152,6 +156,53 @@ export default function Reports() {
     }
   };
 
+  const handleEmailReport = async () => {
+    if (!user?.email) {
+      toast({
+        title: "Error",
+        description: "User email not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsEmailing(true);
+    try {
+      // Generate PDF as Base64 string
+      const pdfBase64 = exportToPDF({
+        period: periodLabel,
+        sales: currentData.sales,
+        transactions: currentData.transactions,
+        profit: currentData.profit,
+        topProducts: topProducts,
+      }, businessName, true); // true = returnAsBase64
+
+      const { error } = await supabase.functions.invoke('email-report', {
+        body: {
+          pdfBase64: pdfBase64,
+          reportName: `${periodLabel} Sales Report`,
+          userEmail: user.email
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Report Sent",
+        description: `The ${periodLabel} PDF report has been sent to ${user.email}`,
+      });
+    } catch (error: any) {
+      console.error("Email error:", error);
+      toast({
+        title: "Email Failed",
+        description: error.message || "Failed to send email. Check your configuration.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEmailing(false);
+    }
+  };
+
   const handleRefresh = () => {
     refreshSales();
     toast({
@@ -208,6 +259,11 @@ export default function Reports() {
               <DropdownMenuItem onClick={handleExportDetailedExcel}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Full Report with Items (Excel)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleEmailReport} disabled={isEmailing}>
+                {isEmailing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                Email Me This Report
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -367,6 +423,7 @@ export default function Reports() {
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• M-Pesa: {periodTransactions.filter(t => t.payment_method === 'mpesa').length} transactions</li>
                     <li>• Cash: {periodTransactions.filter(t => t.payment_method === 'cash').length} transactions</li>
+                    <li>• Paystack: {periodTransactions.filter(t => t.payment_method === 'paystack').length} transactions</li>
                     <li>• M-Pesa revenue: KSh {periodTransactions.filter(t => t.payment_method === 'mpesa').reduce((sum, t) => sum + Number(t.total_amount), 0).toLocaleString()}</li>
                   </ul>
                 </div>

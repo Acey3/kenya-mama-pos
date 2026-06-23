@@ -254,7 +254,7 @@ export function useSales() {
       id: sale.transaction_id,
       items: `${sale.items_count} items`,
       amount: Number(sale.total_amount),
-      method: sale.payment_method === 'mpesa' ? 'M-Pesa' : 'Cash',
+      method: sale.payment_method === 'mpesa' ? 'M-Pesa' : sale.payment_method === 'paystack' ? 'Paystack' : 'Cash',
       time: new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }));
   };

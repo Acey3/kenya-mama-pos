@@ -1,78 +1,83 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-
-//keys provided for Sandbox testing.                    
-const CONSUMER_KEY = 'oQYWn49FVLpaKaznCskdC8RRcqWDANbgBQE8lRYATJ4lL0AI';
-const CONSUMER_SECRET = 'VGMe542uvgnCMoc5S31WKXxryluVhVbGGyyOb1108YuseGMGx1hveLP2BbIYMOwr';
-const PASSKEY = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
-const SHORTCODE = '174379'; // Sandbox Paybill
-const CALLBACK_URL = 'https://htzcagxhnydzqdejpjps.supabase.co/functions/v1/mpesa-callback';
-
-// Toggle this to 'false' when you go live (production)
-const IS_SANDBOX = true; 
-const BASE_URL = IS_SANDBOX ? 'https://sandbox.safaricom.co.ke' : 'https://api.safaricom.co.ke';
-
-async function getAccessToken(): Promise<string> {
-  const credentials = btoa(`${CONSUMER_KEY}:${CONSUMER_SECRET}`);
-  
-  const response = await fetch(`${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Basic ${credentials}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Auth Error:", errorText);
-    throw new Error('Failed to get M-Pesa access token');
-  }
-
-  const data = await response.json();
-  return data.access_token;
-}
-
-function generateTimestamp(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hour = String(now.getHours()).padStart(2, '0');
-  const minute = String(now.getMinutes()).padStart(2, '0');
-  const second = String(now.getSeconds()).padStart(2, '0');
-  return `${year}${month}${day}${hour}${minute}${second}`;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     const { phoneNumber, amount } = await req.json();
-    console.log('Initiating STK Push for:', { phoneNumber, amount });
+    
+    // Get the caller's auth token
+    const authHeader = req.headers.get('Authorization')!;
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
 
-    if (!phoneNumber || !amount) {
-      throw new Error('Phone number and amount are required');
+    // 1. Get the merchant's M-Pesa credentials from the database
+    // The RLS policy ensures we only get the business owned by the authenticated user
+    const { data: business, error: dbError } = await supabaseClient
+      .from('businesses')
+      .select('id, business_name, mpesa_shortcode, mpesa_consumer_key, mpesa_consumer_secret, mpesa_passkey, is_mpesa_live')
+      .single();
+
+    if (dbError || !business) {
+      throw new Error('Merchant M-Pesa credentials not found. Please configure them in Settings.');
     }
 
-    // 1. Get Access Token
-    const accessToken = await getAccessToken();
-    console.log("Access Token received");
+    const { 
+      id: BUSINESS_ID,
+      mpesa_shortcode: SHORTCODE, 
+      mpesa_consumer_key: CONSUMER_KEY, 
+      mpesa_consumer_secret: CONSUMER_SECRET, 
+      mpesa_passkey: PASSKEY, 
+      is_mpesa_live: IS_LIVE 
+    } = business;
 
-    // 2. Prepare Password
-    const timestamp = generateTimestamp();
+    if (!SHORTCODE || !CONSUMER_KEY || !CONSUMER_SECRET || !PASSKEY) {
+      throw new Error('M-Pesa configuration is incomplete. Please check your Settings.');
+    }
+
+    const BASE_URL = IS_LIVE ? 'https://api.safaricom.co.ke' : 'https://sandbox.safaricom.co.ke';
+    
+    // Use SUPABASE_URL if available, otherwise fallback to project ID construction
+    const projectUrl = Deno.env.get('SUPABASE_URL') || `https://${Deno.env.get('SUPABASE_PROJECT_ID')}.supabase.co`;
+    const CALLBACK_URL = `${projectUrl}/functions/v1/mpesa-callback`;
+
+    console.log(`Using Callback URL: ${CALLBACK_URL}`);
+
+    // 2. Get Access Token
+    const credentials = btoa(`${CONSUMER_KEY}:${CONSUMER_SECRET}`);
+    const tokenResponse = await fetch(`${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`, {
+      method: 'GET',
+      headers: { 'Authorization': `Basic ${credentials}` },
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to authenticate with M-Pesa. Check your Consumer Key and Secret.');
+    }
+
+    const { access_token: accessToken } = await tokenResponse.json();
+
+    // 3. Prepare STK Push
+    const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
     const password = btoa(`${SHORTCODE}${PASSKEY}${timestamp}`);
+    
+    // Safaricom is extremely strict. Phone number MUST be 254... and purely numeric.
+    const formattedPhone = phoneNumber.replace(/\D/g, ''); 
 
-    // 3. Prepare Payload
-    // Note: Sandbox PartyB is often the Shortcode.
-    // Ensure phoneNumber starts with 254 (no +)
-    const formattedPhone = phoneNumber.replace('+', '').replace(/^0/, '254');
+    // AccountReference must not exceed 12 chars
+    const safeRef = business.business_name 
+      ? business.business_name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12) 
+      : 'POS';
 
     const stkPayload = {
       BusinessShortCode: SHORTCODE,
@@ -84,9 +89,11 @@ serve(async (req) => {
       PartyB: SHORTCODE, 
       PhoneNumber: formattedPhone,
       CallBackURL: CALLBACK_URL,
-      AccountReference: 'MamaDuka',
+      AccountReference: safeRef || 'POS',
       TransactionDesc: 'POS Payment',
     };
+
+    console.log("Sending STK Payload (omitting password):", { ...stkPayload, Password: '***' });
 
     // 4. Send Request
     const stkResponse = await fetch(`${BASE_URL}/mpesa/stkpush/v1/processrequest`, {
@@ -99,35 +106,43 @@ serve(async (req) => {
     });
 
     const stkResult = await stkResponse.json();
-    console.log('STK Response:', stkResult);
+    console.log("M-Pesa API Response:", stkResult);
 
     if (stkResult.ResponseCode === '0') {
+      
+      // Save pending transaction to track it
+      const { error: insertError } = await supabaseClient.from('mpesa_transactions').insert({
+        checkout_request_id: stkResult.CheckoutRequestID,
+        business_id: BUSINESS_ID,
+        phone: formattedPhone,
+        amount: Math.round(amount),
+        status: 'pending'
+      });
+
+      if (insertError) {
+        console.error("Failed to save pending txn to database:", insertError);
+        throw new Error(`Failed to track payment: ${insertError.message}`);
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
           message: 'STK Push sent successfully',
           checkoutRequestId: stkResult.CheckoutRequestID,
-          merchantRequestId: stkResult.MerchantRequestID,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: stkResult.errorMessage || 'STK Push failed',
-          details: stkResult
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // Return exactly what Safaricom said
+      const errorMsg = stkResult.errorMessage || stkResult.ResultDesc || 'STK Push failed at M-Pesa';
+      throw new Error(`Safaricom Error: ${errorMsg}`);
     }
 
-  } catch (error) {
-    console.error('M-Pesa Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+  } catch (error: any) {
+    console.error('M-Pesa Edge Function Error:', error);
     return new Response(
-      JSON.stringify({ success: false, message: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, message: error.message || "Unknown error occurred" }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

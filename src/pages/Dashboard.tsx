@@ -11,17 +11,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useSales } from "@/hooks/useSales";
 import { BusinessSetupWizard } from "@/components/BusinessSetupWizard";
+import { useBusiness } from "@/hooks/useBusiness";
 
 export default function Dashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { stats, loading, businessId, getRecentTransactions, refreshSales } = useSales();
+  const { refreshBusiness } = useBusiness();
   
   const recentTransactions = getRecentTransactions(5);
 
   // Show setup wizard if no business exists
   if (!loading && !businessId) {
-    return <BusinessSetupWizard onComplete={() => refreshSales()} />;
+    return (
+      <BusinessSetupWizard 
+        onComplete={async () => {
+          await refreshBusiness();
+          await refreshSales();
+        }} 
+      />
+    );
   }
 
   const dashboardStats = [

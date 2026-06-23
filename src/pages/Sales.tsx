@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { PaystackPayment } from "@/components/PaystackPayment";
 import { MpesaPayment } from "@/components/MpesaPayment";
 import { generateReceipt } from "@/lib/exportUtils";
 import { useSales } from "@/hooks/useSales";
@@ -30,6 +31,7 @@ export default function Sales() {
   const { products, loading, updateStock } = useProducts();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isPaystackDialogOpen, setIsPaystackDialogOpen] = useState(false);
   const [isMpesaDialogOpen, setIsMpesaDialogOpen] = useState(false);
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
   const [lastTransactionId, setLastTransactionId] = useState("");
@@ -76,7 +78,7 @@ export default function Sales() {
 
   const clearCart = () => setCart([]);
 
-  const completeSale = async (paymentMethod: 'cash' | 'mpesa') => {
+  const completeSale = async (paymentMethod: 'cash' | 'paystack' | 'mpesa') => {
     if (cart.length === 0) {
       toast({
         title: "Cart Empty",
@@ -94,7 +96,8 @@ export default function Sales() {
         price: item.price,
       }));
       
-      const transactionId = generateReceipt(items, total, paymentMethod === 'cash' ? 'Cash' : 'M-Pesa', businessName);
+      const paymentLabel = paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'mpesa' ? 'M-Pesa' : 'Paystack';
+      const transactionId = generateReceipt(items, total, paymentLabel, businessName);
       setLastTransactionId(transactionId);
       setLastTotal(total);
       
@@ -115,7 +118,7 @@ export default function Sales() {
       
       toast({
         title: "Sale Completed!",
-        description: `Transaction ${transactionId} - KSh ${total.toLocaleString()} (${paymentMethod === 'cash' ? 'Cash' : 'M-Pesa'})`,
+        description: `Transaction ${transactionId} - KSh ${total.toLocaleString()} (${paymentMethod === 'cash' ? 'Cash' : 'Paystack'})`,
       });
       
       setIsReceiptDialogOpen(true);
@@ -132,6 +135,23 @@ export default function Sales() {
   };
 
   const completeCashSale = () => completeSale('cash');
+
+  const handlePaystackPayment = () => {
+    if (cart.length === 0) {
+      toast({
+        title: "Cart Empty",
+        description: "Please add items to cart before payment",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsPaystackDialogOpen(true);
+  };
+
+  const handlePaystackSuccess = async () => {
+    setIsPaystackDialogOpen(false);
+    await completeSale('paystack');
+  };
 
   const handleMpesaPayment = () => {
     if (cart.length === 0) {
@@ -297,14 +317,17 @@ export default function Sales() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Button className="w-full" size="lg" onClick={completeCashSale} disabled={isProcessing}>
+                  <Button className="w-full bg-primary hover:bg-primary/95 text-primary-foreground" size="lg" onClick={completeCashSale} disabled={isProcessing}>
                     {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     <Receipt className="mr-2 h-4 w-4" />
-                    {t('sales.completeSale')} (Cash)
+                    {t('sales.completeSale')} ({t('sales.cash')})
                   </Button>
-                  <Button variant="outline" className="w-full" size="lg" onClick={handleMpesaPayment} disabled={isProcessing}>
+                  <Button className="w-full bg-[#00A650] hover:bg-[#008B43] text-white font-medium" size="lg" onClick={handleMpesaPayment} disabled={isProcessing}>
                     <Smartphone className="mr-2 h-4 w-4" />
                     {t('sales.mpesaPayment')}
+                  </Button>
+                  <Button variant="outline" className="w-full" size="lg" onClick={handlePaystackPayment} disabled={isProcessing}>
+                    {t('sales.onlinePayment')} (Paystack)
                   </Button>
                 </div>
               </div>
@@ -313,15 +336,20 @@ export default function Sales() {
         </CardContent>
       </Card>
 
+      {/* Paystack Payment Dialog */}
+      <Dialog open={isPaystackDialogOpen} onOpenChange={setIsPaystackDialogOpen}>
+        <DialogContent className="sm:max-w-md p-0 border-none bg-transparent">
+          <PaystackPayment 
+            amount={total} 
+            onSuccess={handlePaystackSuccess}
+            onCancel={() => setIsPaystackDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* M-Pesa Payment Dialog */}
       <Dialog open={isMpesaDialogOpen} onOpenChange={setIsMpesaDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>M-Pesa Payment</DialogTitle>
-            <DialogDescription>
-              Enter customer's phone number to send payment request
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-md p-0 border-none bg-transparent">
           <MpesaPayment 
             amount={total} 
             onSuccess={handleMpesaSuccess}

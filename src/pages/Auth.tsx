@@ -122,7 +122,7 @@ const Auth = () => {
     setLoading(true);
     const redirectUrl = `${window.location.origin}/dashboard`;
 
-    const { error } = await supabase.auth.signUp({
+    const { data: authData, error } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
       options: {
@@ -148,6 +148,28 @@ const Auth = () => {
       });
       setLoading(false);
       return;
+    }
+
+    // Immediately create the business record if we have a user
+    // This ensures the sidebar and context pick it up instantly
+    if (authData.user) {
+      const { error: bizError } = await supabase
+        .from("businesses")
+        .upsert({
+          owner_id: authData.user.id,
+          business_name: formData.businessName,
+          business_type: formData.businessType || null,
+          location: formData.location || null,
+          phone: formData.phone || null,
+        }, {
+          onConflict: 'owner_id'
+        });
+      
+      if (bizError) {
+        console.error("Error creating business record:", bizError);
+        // We don't block the UI here since the user is registered
+        // and the trigger might catch it anyway, but we log for safety
+      }
     }
 
     toast({

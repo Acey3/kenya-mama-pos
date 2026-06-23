@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight
+  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -16,99 +16,59 @@ serve(async (req) => {
     const body = await req.json();
     console.log('M-Pesa Callback received:', JSON.stringify(body, null, 2));
 
-    // M-Pesa sends the result in Body.stkCallback
     const stkCallback = body?.Body?.stkCallback;
     
     if (!stkCallback) {
-      console.error('Invalid callback format - no stkCallback found');
-      return new Response(
-        JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('Invalid callback body received from Safaricom');
+      return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
-    const {
-      MerchantRequestID,
-      CheckoutRequestID,
-      ResultCode,
-      ResultDesc,
-      CallbackMetadata
-    } = stkCallback;
+    const { CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = stkCallback;
 
-    console.log('Processing callback:', {
-      MerchantRequestID,
-      CheckoutRequestID,
-      ResultCode,
-      ResultDesc
-    });
+    let status = 'failed';
+    let mpesaReceiptNumber = null;
 
-    // ResultCode 0 = Success, anything else = failure
-    if (ResultCode !== 0) {
-      console.log('Payment failed or cancelled:', ResultDesc);
-      return new Response(
-        JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Extract payment details from CallbackMetadata
-    let amount = 0;
-    let mpesaReceiptNumber = '';
-    let phoneNumber = '';
-    let transactionDate = '';
-
-    if (CallbackMetadata?.Item) {
-      for (const item of CallbackMetadata.Item) {
-        switch (item.Name) {
-          case 'Amount':
-            amount = item.Value;
-            break;
-          case 'MpesaReceiptNumber':
+    if (ResultCode === 0) {
+      status = 'completed';
+      if (CallbackMetadata?.Item) {
+        for (const item of CallbackMetadata.Item) {
+          if (item.Name === 'MpesaReceiptNumber') {
             mpesaReceiptNumber = item.Value;
-            break;
-          case 'PhoneNumber':
-            phoneNumber = String(item.Value);
-            break;
-          case 'TransactionDate':
-            transactionDate = String(item.Value);
-            break;
+          }
         }
       }
+    } else {
+      console.warn(`M-Pesa transaction failed with code ${ResultCode}: ${ResultDesc}`);
     }
 
-    console.log('Payment successful:', {
-      amount,
-      mpesaReceiptNumber,
-      phoneNumber,
-      transactionDate
-    });
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
-    // Initialize Supabase client with service role for backend operations
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log(`Updating transaction ${CheckoutRequestID} to status: ${status}`);
 
-    // Store the M-Pesa transaction for reference
-    // Note: The actual sale record should be created by the frontend when initiating payment
-    // This callback confirms the payment was successful
-    
-    // Log the successful payment
-    console.log(`✅ M-Pesa Payment Confirmed: ${mpesaReceiptNumber} - KSh ${amount} from ${phoneNumber}`);
+    // Update the pending transaction with the final status
+    const { error: updateError } = await supabaseAdmin
+      .from('mpesa_transactions')
+      .update({
+        status,
+        mpesa_receipt_number: mpesaReceiptNumber,
+        result_desc: ResultDesc,
+        updated_at: new Date().toISOString()
+      })
+      .eq('checkout_request_id', CheckoutRequestID);
 
-    // You could also update a pending_payments table here if you have one
-    // For now, we just acknowledge receipt
+    if (updateError) {
+      console.error('Database update error in callback:', updateError);
+    } else {
+      console.log(`Successfully updated transaction ${CheckoutRequestID}`);
+    }
 
     return new Response(
-      JSON.stringify({ 
-        ResultCode: 0, 
-        ResultDesc: 'Success',
-        data: {
-          mpesaReceiptNumber,
-          amount,
-          phoneNumber,
-          checkoutRequestId: CheckoutRequestID
-        }
-      }),
+      JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

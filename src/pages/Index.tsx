@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -79,6 +81,24 @@ const stats = [
 ];
 
 const Index = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        navigate("/dashboard");
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        navigate("/dashboard");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -425,7 +445,7 @@ const Index = () => {
             <span className="font-semibold text-foreground">Mama Duka POS</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            © 2025 Mama Duka. Built with ❤️ for Kenyan shopkeepers.
+            © 2026 Mama Duka. Built with ❤️ for Kenyan shopkeepers.
           </p>
         </div>
       </footer>
