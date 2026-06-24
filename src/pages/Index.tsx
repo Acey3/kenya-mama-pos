@@ -121,6 +121,7 @@ const Index = () => {
         </div>
       </header>
 
+      <main id="main-content">
       {/* Hero Section with Image */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0">
@@ -434,6 +435,7 @@ const Index = () => {
           </Button>
         </div>
       </section>
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-border bg-card py-8">

@@ -12,3 +12,6 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: https://mamadukapos.com/sitemap.xml
+LLMs-txt: https://mamadukapos.com/llms.txt

@@ -1,0 +1,18 @@
+# Mama Duka POS
+
+> A complete point-of-sale and inventory management system optimized for small retail shops (dukas) in Kenya. It tracks sales, manages inventory stock levels, generates reports, and integrates local payments.
+
+## Features
+
+- **Point of Sale (POS) System:** Fast and simple interface for ringing up customer orders, calculating totals, and applying discounts.
+- **Inventory & Stock Management:** Real-time stock tracking, custom categories (e.g., Food, Beverages, Household), and proactive alerts when products are low on stock.
+- **Sales Analytics & Reports:** Full dashboards presenting daily, weekly, and monthly sales trends, category breakdowns, and overall profit reports.
+- **M-Pesa Payment Integration:** Native support for initiating M-Pesa STK Push transactions directly from the checkout screen.
+- **Offline Mode:** Powered by IndexedDB, the system allows shops to continue selling when the internet is down, automatically syncing sales once connection is restored.
+- **Multilingual Support:** Dynamic language translation options including English, Swahili (Kiswahili), Kikuyu, Kalenjin, and Luo.
+
+## Primary Routes
+
+- **Home Page (`/`):** Public marketing page introducing the POS system, key features, business metrics, and registration forms.
+- **Auth Page (`/auth`):** Secure login, sign up, and business onboarding workspace.
+- **Dashboard (`/dashboard`):** The primary app workspace for authenticated shop owners, featuring sub-sections for Sales, Stock, Reports, and Settings.
