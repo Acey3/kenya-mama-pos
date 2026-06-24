@@ -20,8 +20,16 @@ export type Database = {
           business_type: string | null
           created_at: string
           id: string
+          is_mpesa_live: boolean | null
+          is_paystack_live: boolean | null
           location: string | null
+          mpesa_consumer_key: string | null
+          mpesa_consumer_secret: string | null
+          mpesa_passkey: string | null
+          mpesa_shortcode: string | null
           owner_id: string
+          paystack_public_key: string | null
+          paystack_secret_key: string | null
           phone: string | null
           updated_at: string
         }
@@ -30,8 +38,16 @@ export type Database = {
           business_type?: string | null
           created_at?: string
           id?: string
+          is_mpesa_live?: boolean | null
+          is_paystack_live?: boolean | null
           location?: string | null
+          mpesa_consumer_key?: string | null
+          mpesa_consumer_secret?: string | null
+          mpesa_passkey?: string | null
+          mpesa_shortcode?: string | null
           owner_id: string
+          paystack_public_key?: string | null
+          paystack_secret_key?: string | null
           phone?: string | null
           updated_at?: string
         }
@@ -40,12 +56,147 @@ export type Database = {
           business_type?: string | null
           created_at?: string
           id?: string
+          is_mpesa_live?: boolean | null
+          is_paystack_live?: boolean | null
           location?: string | null
+          mpesa_consumer_key?: string | null
+          mpesa_consumer_secret?: string | null
+          mpesa_passkey?: string | null
+          mpesa_shortcode?: string | null
           owner_id?: string
+          paystack_public_key?: string | null
+          paystack_secret_key?: string | null
           phone?: string | null
           updated_at?: string
         }
         Relationships: []
+      }
+      mpesa_transactions: {
+        Row: {
+          amount: number
+          business_id: string
+          checkout_request_id: string
+          created_at: string | null
+          mpesa_receipt_number: string | null
+          phone: string
+          result_desc: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          business_id: string
+          checkout_request_id: string
+          created_at?: string | null
+          mpesa_receipt_number?: string | null
+          phone: string
+          result_desc?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          checkout_request_id?: string
+          created_at?: string | null
+          mpesa_receipt_number?: string | null
+          phone?: string
+          result_desc?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_transactions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_queue: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          product_id: string
+          status: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+          status?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_queue_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paystack_transactions: {
+        Row: {
+          amount: number
+          business_id: string
+          channel: string | null
+          created_at: string | null
+          email: string | null
+          metadata: Json | null
+          reference: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          business_id: string
+          channel?: string | null
+          created_at?: string | null
+          email?: string | null
+          metadata?: Json | null
+          reference: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          channel?: string | null
+          created_at?: string | null
+          email?: string | null
+          metadata?: Json | null
+          reference?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paystack_transactions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
@@ -54,6 +205,7 @@ export type Database = {
           cost_price: number
           created_at: string
           id: string
+          last_low_stock_notification: string | null
           low_stock_threshold: number
           name: string
           price: number
@@ -66,6 +218,7 @@ export type Database = {
           cost_price: number
           created_at?: string
           id?: string
+          last_low_stock_notification?: string | null
           low_stock_threshold?: number
           name: string
           price: number
@@ -78,6 +231,7 @@ export type Database = {
           cost_price?: number
           created_at?: string
           id?: string
+          last_low_stock_notification?: string | null
           low_stock_threshold?: number
           name?: string
           price?: number
