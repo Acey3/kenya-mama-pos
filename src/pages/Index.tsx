@@ -18,7 +18,6 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
-import heroShop from "@/assets/hero-shop.jpg";
 import shopExterior from "@/assets/shop-exterior.jpg";
 
 const salesData = [
@@ -125,11 +124,17 @@ const Index = () => {
       {/* Hero Section with Image */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0">
-          <img 
-            src={heroShop} 
-            alt="Kenyan shopkeeper in their duka" 
-            className="h-full w-full object-cover"
-          />
+          <picture>
+            <source srcSet="/hero-shop.webp" type="image/webp" />
+            <img
+              src="/hero-shop.jpg"
+              alt="Kenyan shopkeeper in their duka"
+              width={1024}
+              height={1024}
+              fetchPriority="high"
+              className="h-full w-full object-cover"
+            />
+          </picture>
           <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/60" />
         </div>
         <div className="container relative mx-auto px-4 py-20 md:py-32">
