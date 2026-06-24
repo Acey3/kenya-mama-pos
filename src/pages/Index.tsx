@@ -18,7 +18,6 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
-import heroShop from "@/assets/hero-shop.jpg";
 import shopExterior from "@/assets/shop-exterior.jpg";
 
 const salesData = [
