@@ -69,14 +69,14 @@ export function Layout() {
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-[60] bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 bg-card border-r transition-all duration-300 lg:relative lg:translate-x-0 lg:flex lg:flex-col shadow-2xl shadow-black/40",
+        "fixed inset-y-0 left-0 z-[70] bg-card border-r transition-all duration-300 lg:relative lg:translate-x-0 lg:flex lg:flex-col shadow-2xl shadow-black/40",
         sidebarOpen ? "translate-x-0 w-64" : "-translate-x-full w-0",
         !sidebarOpen && "lg:w-64",
         isCollapsed && "lg:w-20"
