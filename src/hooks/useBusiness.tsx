@@ -9,15 +9,13 @@ interface BusinessContextType {
   refreshBusiness: () => Promise<void>;
   mpesaCredentials: {
     shortcode: string;
-    consumerKey: string;
-    consumerSecret: string;
-    passkey: string;
     isLive: boolean;
+    isConfigured: boolean;
   } | null;
   paystackCredentials: {
     publicKey: string;
-    secretKey: string;
     isLive: boolean;
+    isConfigured: boolean;
   } | null;
 }
 
@@ -43,28 +41,27 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
     
     console.log("Fetching business for user:", user.id);
     const { data, error } = await supabase
-      .from("businesses")
-      .select("id, business_name, mpesa_shortcode, mpesa_consumer_key, mpesa_consumer_secret, mpesa_passkey, is_mpesa_live, paystack_public_key, paystack_secret_key, is_paystack_live")
+      .from("businesses_safe" as any)
+      .select("id, business_name, mpesa_shortcode, is_mpesa_live, is_mpesa_configured, paystack_public_key, is_paystack_live, is_paystack_configured")
       .eq("owner_id", user.id)
       .maybeSingle();
 
     if (error) {
       console.error("Error fetching business:", error);
     } else if (data) {
-      console.log("Business data found:", data.business_name);
-      setBusinessName(data.business_name || "My Shop");
-      setBusinessId(data.id);
+      const b = data as any;
+      console.log("Business data found:", b.business_name);
+      setBusinessName(b.business_name || "My Shop");
+      setBusinessId(b.id);
       setMpesaCredentials({
-        shortcode: data.mpesa_shortcode || "",
-        consumerKey: data.mpesa_consumer_key || "",
-        consumerSecret: data.mpesa_consumer_secret || "",
-        passkey: data.mpesa_passkey || "",
-        isLive: data.is_mpesa_live || false,
+        shortcode: b.mpesa_shortcode || "",
+        isLive: b.is_mpesa_live || false,
+        isConfigured: !!b.is_mpesa_configured,
       });
       setPaystackCredentials({
-        publicKey: data.paystack_public_key || "",
-        secretKey: data.paystack_secret_key || "",
-        isLive: data.is_paystack_live || false,
+        publicKey: b.paystack_public_key || "",
+        isLive: b.is_paystack_live || false,
+        isConfigured: !!b.is_paystack_configured,
       });
     }
     setLoading(false);
