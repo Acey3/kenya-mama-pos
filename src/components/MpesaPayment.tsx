@@ -28,11 +28,7 @@ export function MpesaPayment({ amount, onSuccess, onError, onCancel }: MpesaPaym
   const [status, setStatus] = useState<'idle' | 'processing' | 'waiting_for_pin' | 'success' | 'error'>('idle');
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
 
-  const isConfigured = mpesaCredentials && 
-    mpesaCredentials.shortcode && 
-    mpesaCredentials.consumerKey && 
-    mpesaCredentials.consumerSecret && 
-    mpesaCredentials.passkey;
+  const isConfigured = !!(mpesaCredentials && mpesaCredentials.isConfigured);
 
   // Quick helper to fix Kenyan numbers
   const formatPhone = (phone: string) => {
@@ -207,9 +203,7 @@ export function MpesaPayment({ amount, onSuccess, onError, onCancel }: MpesaPaym
             <p>Missing requirements:</p>
             <ul className="list-disc pl-5 space-y-1">
               {!mpesaCredentials?.shortcode && <li>Shortcode (Till/Paybill)</li>}
-              {!mpesaCredentials?.consumerKey && <li>Consumer Key</li>}
-              {!mpesaCredentials?.consumerSecret && <li>Consumer Secret</li>}
-              {!mpesaCredentials?.passkey && <li>Online Passkey</li>}
+              {!mpesaCredentials?.isConfigured && <li>Consumer Key, Consumer Secret and Online Passkey</li>}
             </ul>
           </div>
           <div className="flex gap-3">

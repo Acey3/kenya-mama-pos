@@ -113,6 +113,13 @@ export type Database = {
             referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "mpesa_transactions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notification_queue: {
@@ -143,6 +150,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_queue_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses_safe"
             referencedColumns: ["id"]
           },
           {
@@ -194,6 +208,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paystack_transactions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -337,7 +358,57 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      businesses_safe: {
+        Row: {
+          business_name: string | null
+          business_type: string | null
+          created_at: string | null
+          id: string | null
+          is_mpesa_configured: boolean | null
+          is_mpesa_live: boolean | null
+          is_paystack_configured: boolean | null
+          is_paystack_live: boolean | null
+          location: string | null
+          mpesa_shortcode: string | null
+          owner_id: string | null
+          paystack_public_key: string | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          business_name?: string | null
+          business_type?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_mpesa_configured?: never
+          is_mpesa_live?: boolean | null
+          is_paystack_configured?: never
+          is_paystack_live?: boolean | null
+          location?: string | null
+          mpesa_shortcode?: string | null
+          owner_id?: string | null
+          paystack_public_key?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          business_name?: string | null
+          business_type?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_mpesa_configured?: never
+          is_mpesa_live?: boolean | null
+          is_paystack_configured?: never
+          is_paystack_live?: boolean | null
+          location?: string | null
+          mpesa_shortcode?: string | null
+          owner_id?: string | null
+          paystack_public_key?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
