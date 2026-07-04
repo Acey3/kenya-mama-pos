@@ -11,8 +11,7 @@
 - **Offline Mode:** Powered by IndexedDB, the system allows shops to continue selling when the internet is down, automatically syncing sales once connection is restored.
 - **Multilingual Support:** Dynamic language translation options including English, Swahili (Kiswahili), Kikuyu, Kalenjin, and Luo.
 
-## Primary Routes
+## Pages
 
-- **Home Page (`/`):** Public marketing page introducing the POS system, key features, business metrics, and registration forms.
-- **Auth Page (`/auth`):** Secure login, sign up, and business onboarding workspace.
-- **Dashboard (`/dashboard`):** The primary app workspace for authenticated shop owners, featuring sub-sections for Sales, Stock, Reports, and Settings.
+- [Home](/): Marketing page introducing the POS system, key features, and registration.
+- [Sign in / Register](/auth): Secure login, sign up, and business onboarding.
