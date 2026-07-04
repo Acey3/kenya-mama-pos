@@ -89,12 +89,14 @@ export default function SettingsPage() {
       ...initial,
       shopName: businessName || initial.shopName,
       mpesaNumber: mpesaCredentials?.shortcode || initial.mpesaNumber,
-      mpesaConsumerKey: mpesaCredentials?.consumerKey || initial.mpesaConsumerKey,
-      mpesaConsumerSecret: mpesaCredentials?.consumerSecret || initial.mpesaConsumerSecret,
-      mpesaPasskey: mpesaCredentials?.passkey || initial.mpesaPasskey,
+      // Secret credentials are never sent to the client; leave blank so
+      // the user can enter a new value to update, or keep existing on save.
+      mpesaConsumerKey: "",
+      mpesaConsumerSecret: "",
+      mpesaPasskey: "",
       isMpesaLive: mpesaCredentials?.isLive || initial.isMpesaLive,
       paystackPublicKey: paystackCredentials?.publicKey || initial.paystackPublicKey,
-      paystackSecretKey: paystackCredentials?.secretKey || initial.paystackSecretKey,
+      paystackSecretKey: "",
       isPaystackLive: paystackCredentials?.isLive || initial.isPaystackLive,
     });
   }, [businessId, mpesaCredentials, paystackCredentials, businessName]);
@@ -117,21 +119,25 @@ export default function SettingsPage() {
 
     try {
       // 1. Update or Insert into Supabase (Upsert)
+      // Only include secret fields in the payload when the user actually
+      // entered a new value — blank means "keep existing".
+      const payload: Record<string, any> = {
+        id: businessId || undefined,
+        owner_id: user.id,
+        business_name: settings.shopName,
+        mpesa_shortcode: settings.mpesaNumber,
+        is_mpesa_live: settings.isMpesaLive,
+        paystack_public_key: settings.paystackPublicKey,
+        is_paystack_live: settings.isPaystackLive,
+      };
+      if (settings.mpesaConsumerKey) payload.mpesa_consumer_key = settings.mpesaConsumerKey;
+      if (settings.mpesaConsumerSecret) payload.mpesa_consumer_secret = settings.mpesaConsumerSecret;
+      if (settings.mpesaPasskey) payload.mpesa_passkey = settings.mpesaPasskey;
+      if (settings.paystackSecretKey) payload.paystack_secret_key = settings.paystackSecretKey;
+
       const { error } = await supabase
         .from("businesses")
-        .upsert({
-          id: businessId || undefined, 
-          owner_id: user.id,
-          business_name: settings.shopName,
-          mpesa_shortcode: settings.mpesaNumber,
-          mpesa_consumer_key: settings.mpesaConsumerKey,
-          mpesa_consumer_secret: settings.mpesaConsumerSecret,
-          mpesa_passkey: settings.mpesaPasskey,
-          is_mpesa_live: settings.isMpesaLive,
-          paystack_public_key: settings.paystackPublicKey,
-          paystack_secret_key: settings.paystackSecretKey,
-          is_paystack_live: settings.isPaystackLive,
-        }, { onConflict: 'owner_id' }); 
+        .upsert(payload, { onConflict: 'owner_id' });
 
       if (error) throw error;
       
