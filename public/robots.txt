@@ -13,5 +13,5 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://kenya-mama-pos.vercel.app/sitemap.xml
-LLMs-txt: https://kenya-mama-pos.vercel.app/llms.txt
+Sitemap: https://kenya-mama-pos.lovable.app/sitemap.xml
+LLMs-txt: https://kenya-mama-pos.lovable.app/llms.txt
