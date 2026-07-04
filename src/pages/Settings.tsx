@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { Seo } from "@/components/Seo";
 // icons
 import { Save, Store, Globe, Bell, Shield, Smartphone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -170,6 +171,11 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 p-2">
+      <Seo
+        title="Settings — Mama Duka POS"
+        description="Manage your shop profile, language, M-Pesa credentials, and notification preferences."
+        path="/dashboard/settings"
+      />
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t('settings.title')}</h1>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Seo } from "@/components/Seo";
 import { Plus, Minus, Trash2, Search, Receipt, Smartphone, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -195,6 +196,11 @@ export default function Sales() {
 
   return (
     <div className="grid lg:grid-cols-3 gap-6">
+      <Seo
+        title="Sales — Mama Duka POS"
+        description="Ring up customer orders, take M-Pesa payments, and print or share receipts from your shop's POS."
+        path="/dashboard/sales"
+      />
       {/* Products Section */}
       <div className="lg:col-span-2 space-y-4">
         <div>

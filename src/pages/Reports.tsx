@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { Seo } from "@/components/Seo";
 import { Download, TrendingUp, DollarSign, ShoppingCart, FileText, FileSpreadsheet, Loader2, RefreshCw, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -221,6 +222,11 @@ export default function Reports() {
 
   return (
     <div className="space-y-4">
+      <Seo
+        title="Reports & Analytics — Mama Duka POS"
+        description="Daily, weekly, and monthly sales reports for your shop, with export to PDF and Excel."
+        path="/dashboard/reports"
+      />
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">{t('reports.title')}</h1>

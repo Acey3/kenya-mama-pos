@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Seo } from "@/components/Seo";
 import { Plus, Edit, Trash2, Search, AlertTriangle, Download, FileText, FileSpreadsheet, Loader2, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -312,6 +313,11 @@ export default function Stock() {
 
   return (
     <div className="space-y-4">
+      <Seo
+        title="Stock & Inventory — Mama Duka POS"
+        description="Track stock levels, add products, and get low-stock alerts for your shop's inventory."
+        path="/dashboard/stock"
+      />
       <div className="flex justify-between items-center flex-wrap gap-2">
         <div>
           <h1 className="text-3xl font-bold">{t('stock.title')}</h1>

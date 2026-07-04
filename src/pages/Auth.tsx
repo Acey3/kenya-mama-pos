@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Store, Mail, Lock, User, Phone, MapPin, Building } from "lucide-react";
 import { z } from "zod";
+import { Seo } from "@/components/Seo";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -181,6 +182,11 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
+      <Seo
+        title={isLogin ? "Login — Mama Duka POS" : "Register your shop — Mama Duka POS"}
+        description={isLogin ? "Sign in to your Mama Duka POS account to manage sales, stock, and reports for your shop." : "Create a free Mama Duka POS account and start tracking sales, stock, and M-Pesa payments for your shop."}
+        path="/auth"
+      />
       <h1 className="sr-only">{isLogin ? "Sign in to Mama Duka POS" : "Register your shop on Mama Duka POS"}</h1>
       <Card className="w-full max-w-md shadow-xl border-primary/20">
         <CardHeader className="text-center space-y-2">
