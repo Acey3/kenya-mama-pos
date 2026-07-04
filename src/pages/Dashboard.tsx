@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { Seo } from "@/components/Seo";
 import { 
   ShoppingCart, 
   Package, 
@@ -74,6 +75,11 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
+      <Seo
+        title="Dashboard — Mama Duka POS"
+        description="Overview of your shop's sales, stock levels, and daily performance at a glance."
+        path="/dashboard"
+      />
       <div>
         <h1 className="text-3xl font-bold">{t('dashboard.title')}</h1>
         <p className="text-muted-foreground">{t('dashboard.subtitle')}</p>
