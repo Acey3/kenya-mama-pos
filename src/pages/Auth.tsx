@@ -181,6 +181,7 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10 flex items-center justify-center p-4">
+      <h1 className="sr-only">{isLogin ? "Sign in to Mama Duka POS" : "Register your shop on Mama Duka POS"}</h1>
       <Card className="w-full max-w-md shadow-xl border-primary/20">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center mb-2">
