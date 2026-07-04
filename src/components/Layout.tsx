@@ -95,7 +95,7 @@ export function Layout() {
           <div className="p-2 bg-primary/10 rounded-lg text-primary shrink-0">
             <ShieldCheck size={24} />
           </div>
-          {!isCollapsed && <h1 className="text-lg font-bold text-foreground truncate">{businessName}</h1>}
+          {!isCollapsed && <p className="text-lg font-bold text-foreground truncate">{businessName}</p>}
           <Button
             variant="ghost"
             size="sm"
