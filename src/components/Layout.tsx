@@ -83,9 +83,10 @@ export function Layout() {
         {/* Toggle Button - Desktop */}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
+          aria-label="Toggle sidebar"
           className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 bg-primary rounded-full items-center justify-center text-primary-foreground border-2 border-background z-[60] shadow-lg hover:scale-110 transition-transform"
         >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {isCollapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
         </button>
 
         <div className={cn(
@@ -93,16 +94,17 @@ export function Layout() {
           isCollapsed ? "justify-center" : "justify-start"
         )}>
           <div className="p-2 bg-primary/10 rounded-lg text-primary shrink-0">
-            <ShieldCheck size={24} />
+            <ShieldCheck size={24} aria-hidden="true" />
           </div>
           {!isCollapsed && <p className="text-lg font-bold text-foreground truncate">{businessName}</p>}
           <Button
             variant="ghost"
             size="sm"
             className="lg:hidden ml-auto"
+            aria-label="Close menu"
             onClick={() => setSidebarOpen(false)}
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </Button>
         </div>
         
@@ -158,9 +160,10 @@ export function Layout() {
             variant="ghost"
             size="sm"
             className="lg:hidden mr-2"
+            aria-label="Open menu"
             onClick={() => setSidebarOpen(true)}
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-5 w-5" aria-hidden="true" />
           </Button>
           
           <div className="flex items-center space-x-4 ml-auto">
